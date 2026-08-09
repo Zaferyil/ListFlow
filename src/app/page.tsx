@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Listing, ListingWarning } from "@/lib/etsy";
 import { DEFAULT_PRODUCT_ID, findProduct, PRODUCTS } from "@/lib/products";
+import { DropZone } from "./DropZone";
 import { ListingCard } from "./ListingCard";
 
 type Tab = "design" | "niche" | "sheet";
@@ -94,22 +95,10 @@ interface TabProps {
 
 function DesignTab({ requiredKeywords, productId }: TabProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [context, setContext] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Object URLs leak unless revoked when the selection changes or unmounts.
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
 
   async function submit() {
     if (!file) return;
@@ -137,23 +126,9 @@ function DesignTab({ requiredKeywords, productId }: TabProps) {
   return (
     <>
       <div className="card">
+        <DropZone file={file} onFileChange={setFile} />
+
         <div className="field">
-          <label htmlFor="design">Design file (PNG, JPEG, WebP, GIF, SVG — max 8 MB)</label>
-          <input
-            id="design"
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.svg"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-          />
-        </div>
-
-        {previewUrl && (
-          // Local blob preview — next/image would need a configured loader for blob: URLs.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt="Preview of the uploaded design" className="preview" />
-        )}
-
-        <div className="field" style={{ marginTop: "1rem" }}>
           <label htmlFor="design-context">Extra context (optional)</label>
           <textarea
             id="design-context"
