@@ -154,13 +154,13 @@ function DesignTab({ productId }: TabProps) {
         )}
       </Step>
 
-      {result && <EtsyStep listing={result.listing} productId={productId} />}
+      <EtsyStep listing={result?.listing ?? null} productId={productId} />
     </>
   );
 }
 
-/** Step 4 only exists once there is a listing worth sending. */
-function EtsyStep({ listing, productId }: { listing: Listing; productId: string }) {
+/** Step 4: connecting the shop is one-time setup, so it shows before a listing exists too. */
+function EtsyStep({ listing, productId }: { listing: Listing | null; productId: string }) {
   return (
     <Step
       number={4}
@@ -228,7 +228,7 @@ function NicheTab({ productId }: TabProps) {
         )}
       </Step>
 
-      {result && <EtsyStep listing={result.listing} productId={productId} />}
+      <EtsyStep listing={result?.listing ?? null} productId={productId} />
     </>
   );
 }

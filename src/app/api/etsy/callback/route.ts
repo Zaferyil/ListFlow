@@ -1,40 +1,55 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { exchangeCode } from "@/lib/etsy-api";
 import { storeTokens } from "@/lib/etsy-tokens";
 
 export const runtime = "nodejs";
 
-/** Where Etsy sends the seller back. Finishes the handshake, then returns to the app. */
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const home = new URL("/", url.origin);
-
-  const denied = url.searchParams.get("error");
-  if (denied) {
-    home.searchParams.set("etsy", `error:${denied}`);
-    return NextResponse.redirect(home);
-  }
-
-  const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
-  const expectedState = request.headers.get("cookie")?.match(/etsy_state=([^;]+)/)?.[1];
-  const verifier = request.headers.get("cookie")?.match(/etsy_verifier=([^;]+)/)?.[1];
-
-  // A mismatched state means the callback did not originate from our redirect.
-  if (!code || !verifier || !state || state !== expectedState) {
-    home.searchParams.set("etsy", "error:invalid_callback");
-    return NextResponse.redirect(home);
-  }
-
-  try {
-    await storeTokens(await exchangeCode(code, verifier));
-    home.searchParams.set("etsy", "connected");
-  } catch (error) {
-    home.searchParams.set("etsy", `error:${error instanceof Error ? error.message : "failed"}`);
-  }
+/** Sends the seller back to the app with a message, and clears the handshake cookies. */
+function back(origin: string, message: string): NextResponse {
+  const home = new URL("/", origin);
+  home.searchParams.set("etsy", message);
 
   const response = NextResponse.redirect(home);
   response.cookies.delete("etsy_verifier");
   response.cookies.delete("etsy_state");
   return response;
+}
+
+/** Where Etsy sends the seller back. Finishes the handshake, then returns to the app. */
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+
+  const denied = url.searchParams.get("error");
+  if (denied) {
+    return back(url.origin, `error:${url.searchParams.get("error_description") ?? denied}`);
+  }
+
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
+  const expectedState = request.cookies.get("etsy_state")?.value;
+  const verifier = request.cookies.get("etsy_verifier")?.value;
+
+  // Each of these fails for its own reason, and the fix differs, so say which.
+  if (!code) {
+    return back(url.origin, "error:Etsy did not send an authorization code. Start from Connect to Etsy.");
+  }
+  if (!verifier || !expectedState) {
+    return back(
+      url.origin,
+      "error:The sign-in cookie was missing. It expires after 10 minutes, and it is dropped if you open the callback link directly or block cookies. Press Connect to Etsy and finish in the same window.",
+    );
+  }
+  if (state !== expectedState) {
+    return back(
+      url.origin,
+      "error:The sign-in did not match this window — this happens when Connect is pressed twice. Press Connect to Etsy once and finish that tab.",
+    );
+  }
+
+  try {
+    await storeTokens(await exchangeCode(code, verifier));
+    return back(url.origin, "connected");
+  } catch (error) {
+    return back(url.origin, `error:${error instanceof Error ? error.message : "Token exchange failed."}`);
+  }
 }

@@ -61,7 +61,13 @@ function loadSettings(productId: string): PublishSettings {
   }
 }
 
-export function EtsyPanel({ listing, productId }: { listing: Listing; productId: string }) {
+/**
+ * `listing` is null until one has been generated. The panel still renders then,
+ * so the shop can be connected before or after generating — connecting reloads
+ * the page, and a step that only appeared alongside a listing would vanish at
+ * exactly the moment it had something to report.
+ */
+export function EtsyPanel({ listing, productId }: { listing: Listing | null; productId: string }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [settings, setSettings] = useState<PublishSettings>(DEFAULTS);
@@ -69,6 +75,20 @@ export function EtsyPanel({ listing, productId }: { listing: Listing; productId:
   const [result, setResult] = useState<{ url: string; listingId: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [callbackNote, setCallbackNote] = useState<string | null>(null);
+
+  // The OAuth callback reports back through ?etsy=…; show it here rather than
+  // leaving the seller to read it out of the address bar.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const message = params.get("etsy");
+    if (!message) return;
+
+    setCallbackNote(message);
+    params.delete("etsy");
+    const query = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
+  }, []);
 
   // Settings are per-blank, so switching blanks reloads that blank's saved values.
   useEffect(() => {
@@ -103,6 +123,7 @@ export function EtsyPanel({ listing, productId }: { listing: Listing; productId:
   }, [status?.connected]);
 
   async function publish() {
+    if (!listing) return;
     setBusy(true);
     setError(null);
     setResult(null);
@@ -135,9 +156,18 @@ export function EtsyPanel({ listing, productId }: { listing: Listing; productId:
 
   if (!status) return null;
 
+  const note = callbackNote ? (
+    callbackNote.startsWith("error:") ? (
+      <div className="alert error">{callbackNote.slice("error:".length)}</div>
+    ) : (
+      <div className="alert info">Connected to Etsy.</div>
+    )
+  ) : null;
+
   if (!status.configured) {
     return (
       <div className="card">
+        {note}
         <p className="hint" style={{ margin: 0 }}>
           Add <code>ETSY_KEYSTRING</code> to <code>.env.local</code> to send listings straight to
           your shop.
@@ -149,6 +179,7 @@ export function EtsyPanel({ listing, productId }: { listing: Listing; productId:
   if (!status.connected) {
     return (
       <div className="card">
+        {note}
         {status.error && <div className="alert error">{status.error}</div>}
         <a className="primary" href="/api/etsy/connect">
           Connect to Etsy
@@ -164,10 +195,11 @@ export function EtsyPanel({ listing, productId }: { listing: Listing; productId:
   const visibleCategories = search.trim()
     ? categories.filter((entry) => entry.path.toLowerCase().includes(search.trim().toLowerCase()))
     : categories;
-  const ready = settings.taxonomyId !== null && Number(settings.price) > 0;
+  const ready = listing !== null && settings.taxonomyId !== null && Number(settings.price) > 0;
 
   return (
     <div className="card">
+      {note}
       <p className="hint" style={{ marginTop: 0 }}>
         Connected to <strong>{status.shop?.shopName}</strong>.{" "}
         <button
@@ -279,7 +311,13 @@ export function EtsyPanel({ listing, productId }: { listing: Listing; productId:
         </button>
       </div>
 
-      {!ready && <p className="hint">Pick a category and a price to enable sending.</p>}
+      {!ready && (
+        <p className="hint">
+          {listing
+            ? "Pick a category and a price to enable sending."
+            : "Generate a listing in step 3 first — your settings above are saved."}
+        </p>
+      )}
       {error && <div className="alert error" style={{ marginTop: "1rem" }}>{error}</div>}
       {result && (
         <div className="alert info" style={{ marginTop: "1rem" }}>
