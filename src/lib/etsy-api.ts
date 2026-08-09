@@ -241,6 +241,27 @@ export function stripEmoji(text: string): string {
     .replace(/ +$/gm, "");
 }
 
+/**
+ * Etsy's materials field takes letters, numbers and spaces only, so the
+ * catalogue's readable values ("100% ring-spun cotton") are rejected outright.
+ * The hyphen goes, and "%" becomes "percent" rather than vanishing — "100
+ * cotton" reads like a typo. As with the emoji strip, only what is sent
+ * changes; the listing shown to the seller keeps the original wording.
+ */
+export function cleanMaterials(materials: string[]): string[] {
+  const cleaned = materials.map((material) =>
+    material
+      .replace(/%/g, " percent ")
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 45)
+      .trim(),
+  );
+
+  return [...new Set(cleaned.filter(Boolean))];
+}
+
 export interface DraftListingInput {
   quantity: number;
   title: string;
@@ -279,7 +300,7 @@ export async function createDraftListing(
     taxonomy_id: input.taxonomyId,
     readiness_state_id: input.readinessStateId,
     tags: input.tags,
-    materials: input.materials,
+    materials: cleanMaterials(input.materials),
     // Physical goods; "download" would be a digital listing.
     type: "physical",
     is_supply: false,
