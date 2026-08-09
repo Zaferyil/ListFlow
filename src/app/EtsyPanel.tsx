@@ -625,6 +625,16 @@ export function EtsyPanel({
                         : [...current, image.name],
                     );
                   }
+                  // Reordering is dragging, which a keyboard cannot do; alt +
+                  // arrow keeps it reachable without buttons in every row.
+                  if (event.altKey && event.key === "ArrowUp") {
+                    event.preventDefault();
+                    void reorder(index, index - 1);
+                  }
+                  if (event.altKey && event.key === "ArrowDown") {
+                    event.preventDefault();
+                    void reorder(index, index + 1);
+                  }
                 }}
                 onDragStart={(event) => {
                   setDraggingIndex(index);
@@ -659,32 +669,7 @@ export function EtsyPanel({
                   </strong>
                   {formatSize(image.size)}
                 </span>
-                <span
-                  className="template-actions"
-                  // The arrows reorder; they must not also toggle the row.
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {/* Dragging is the quick way; the arrows make it precise and
-                      reachable without a mouse. */}
-                  <button
-                    type="button"
-                    className="ghost"
-                    aria-label={`Move ${image.name} up`}
-                    disabled={index === 0}
-                    onClick={() => reorder(index, index - 1)}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost"
-                    aria-label={`Move ${image.name} down`}
-                    disabled={index === templates.length - 1}
-                    onClick={() => reorder(index, index + 1)}
-                  >
-                    ↓
-                  </button>
-                </span>
+
               </li>
             ))}
           </ul>
@@ -711,7 +696,7 @@ export function EtsyPanel({
         {templateError && <div className="alert error">{templateError}</div>}
         <p className="hint">
           Added to every listing for this blank — size chart, care card, colour chart. Uploaded top
-          to bottom; drag a row, or use the arrows, to rearrange. Click rows to select them, then
+          to bottom; drag a row to rearrange it. Click rows to select them, then
           remove them together. Etsy allows 10 photos and shows the first as the search thumbnail.
         </p>
       </div>
