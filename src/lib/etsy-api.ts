@@ -248,6 +248,12 @@ export interface SizeVariation {
 }
 
 export interface VariationInput {
+  /**
+   * What the first menu is called on Etsy. These blanks are sold as one listing
+   * covering several garments, so the values read "Short Sleeve / S" and the
+   * menu is named "Size and Style" rather than "Size".
+   */
+  sizeLabel: string;
   sizes: SizeVariation[];
   colors: string[];
   quantity: number;
@@ -301,7 +307,7 @@ export async function updateListingInventory(
       const propertyValues = [
         {
           property_id: SIZE_PROPERTY,
-          property_name: "Size",
+          property_name: input.sizeLabel.trim() || "Size",
           value_ids: [],
           values: [size.name.trim()],
         },

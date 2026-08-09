@@ -47,6 +47,8 @@ interface PublishSettings {
   whoMade: "i_did" | "someone_else" | "collective";
   whenMade: string;
   variationsOn: boolean;
+  /** Name of the first variation menu on Etsy. */
+  sizeLabel: string;
   /** One "size = price" per line, so a size run can be pasted or edited whole. */
   sizesText: string;
   /** One colour per line. */
@@ -65,7 +67,25 @@ const DEFAULTS: PublishSettings = {
   whoMade: "i_did",
   whenMade: "made_to_order",
   variationsOn: false,
-  sizesText: "S = 24.99\nM = 24.99\nL = 24.99\nXL = 24.99\n2XL = 26.99\n3XL = 28.99",
+  sizeLabel: "Size and Style",
+  sizesText: [
+    "Short Sleeve / S = 47.99",
+    "Short Sleeve / M = 47.99",
+    "Short Sleeve / L = 47.99",
+    "Short Sleeve / XL = 47.99",
+    "Short Sleeve / 2XL = 49.91",
+    "Short Sleeve / 3XL = 51.83",
+    "Long Sleeve / S = 52.79",
+    "Long Sleeve / M = 52.79",
+    "Long Sleeve / L = 52.79",
+    "Long Sleeve / XL = 52.79",
+    "Long Sleeve / 2XL = 54.71",
+    "Long Sleeve / 3XL = 56.63",
+    "Youth / S = 38.39",
+    "Youth / M = 38.39",
+    "Youth / L = 38.39",
+    "Youth / XL = 38.39",
+  ].join("\n"),
   colorsText: "",
 };
 
@@ -203,7 +223,11 @@ export function EtsyPanel({
           whoMade: settings.whoMade,
           whenMade: settings.whenMade,
           variations: settings.variationsOn
-            ? { sizes: parseSizes(settings.sizesText), colors: parseColors(settings.colorsText) }
+            ? {
+                sizeLabel: settings.sizeLabel,
+                sizes: parseSizes(settings.sizesText),
+                colors: parseColors(settings.colorsText),
+              }
             : undefined,
         }),
       });
@@ -267,7 +291,7 @@ export function EtsyPanel({
     settings.taxonomyId !== null &&
     settings.readinessStateId !== null &&
     Number(settings.price) > 0 &&
-    (!settings.variationsOn || sizeCount > 0);
+    (!settings.variationsOn || (sizeCount > 0 && settings.sizeLabel.trim().length > 0));
 
   return (
     <div className="card">
@@ -407,15 +431,25 @@ export function EtsyPanel({
 
       {settings.variationsOn && (
         <>
+          <div className="field">
+            <label htmlFor="etsy-size-label">Name of the first menu</label>
+            <input
+              id="etsy-size-label"
+              value={settings.sizeLabel}
+              onChange={(event) => update({ sizeLabel: event.target.value })}
+              placeholder="Size and Style"
+            />
+          </div>
+
           <div className="row">
             <div className="field">
-              <label htmlFor="etsy-sizes">Sizes and prices</label>
+              <label htmlFor="etsy-sizes">{settings.sizeLabel || "Size"} and prices</label>
               <textarea
                 id="etsy-sizes"
                 rows={7}
                 value={settings.sizesText}
                 onChange={(event) => update({ sizesText: event.target.value })}
-                placeholder={"S = 24.99\nM = 24.99\n2XL = 26.99"}
+                placeholder={"Short Sleeve / S = 47.99\nLong Sleeve / S = 52.79"}
               />
             </div>
             <div className="field">
@@ -430,7 +464,8 @@ export function EtsyPanel({
             </div>
           </div>
           <p className="hint">
-            One per line; sizes take <code>name = price</code>. Etsy lets price vary on one
+            One per line, as <code>name = price</code>. The name is what the buyer picks, so it
+            can carry the garment too — <code>Short Sleeve / 2XL</code>. Etsy lets price vary on one
             variation only, so it follows size — every colour of a 2XL costs the same.{" "}
             {sizeCount > 0
               ? `${offeringCount} combination${offeringCount === 1 ? "" : "s"} — ${sizeCount} size${sizeCount === 1 ? "" : "s"}${colorCount > 0 ? ` × ${colorCount} colour${colorCount === 1 ? "" : "s"}` : ", no colours"}.`

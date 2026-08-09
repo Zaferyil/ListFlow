@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const variationsSchema = z.object({
+  sizeLabel: z.string().trim().min(1).max(45),
   sizes: z
     .array(z.object({ name: z.string().trim().min(1), price: z.number().positive() }))
     .min(1),

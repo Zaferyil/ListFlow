@@ -109,7 +109,8 @@ Bağlantı `.data/etsy-tokens.json` içinde tutulur (gitignore'da). Access token
 
 **Add size and colour variations** kutusunu işaretlerseniz taslak, beden × renk kombinasyonlarıyla oluşturulur (Etsy'nin `updateListingInventory` ucu, taslak açıldıktan sonra ikinci bir çağrıyla).
 
-- **Sizes and prices** — satır başına `beden = fiyat`. Etsy fiyatın **tek bir varyasyona** bağlanmasına izin veriyor; burada o varyasyon beden. Yani 2XL'in her rengi aynı fiyat.
+- **Name of the first menu** — Etsy'de ilk açılır menünün adı. Varsayılan **Size and Style**, çünkü bu listingler tek ilanda birden fazla giysi taşıyor.
+- **Sizes and prices** — satır başına `değer = fiyat`. Değer müşterinin seçtiği şey, o yüzden giysiyi de taşıyabilir: `Short Sleeve / 2XL = 49.91`. Etsy fiyatın **tek bir varyasyona** bağlanmasına izin veriyor; burada o varyasyon beden. Yani 2XL'in her rengi aynı fiyat.
 - **Colours** — satır başına bir renk. Comfort Colors 1717'nin 24 rengi katalogda tanımlı, o blank'te hazır geliyor (`src/lib/products.ts` → `colors`). Diğer blank'lerin renk dizisi doğrulanmadığı için boş; elle yazdığınızda kaydediliyor. Kaydedilmiş bir liste varsa katalog onu **ezmez**.
 - Listing fiyatı en ucuz bedene eşitlenir; Etsy bunu "from" fiyatı olarak gösterir.
 
