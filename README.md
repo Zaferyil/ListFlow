@@ -125,7 +125,8 @@ Panelde kategori, işlem profili (processing profile), kargo profili, fiyat, ade
 Her listing'e giren sabit görseller (beden tablosu, yıkama talimatı, renk kartı) blank başına bir kez yüklenir; taslak oluşturulduktan sonra otomatik eklenir.
 
 - Paneldeki **Template photos** alanına sürükleyip bırakın (ya da tıklayıp seçin). PNG, JPEG, GIF; dosya başına en fazla 20 MB.
-- **İsim sırasına göre** yüklenir, o yüzden dosyaları `1-`, `2-`, `3-` diye numaralayın. Etsy ilk görseli aramada çıkan küçük resim olarak kullanıyor.
+- **Listedeki sırayla** yüklenir. Sırayı fareyle sürükleyerek ya da ↑ ↓ oklarıyla değiştirirsiniz; seçim `.data/templates/<blank-id>/.order.json` içinde saklanır. Etsy ilk görseli aramada çıkan küçük resim olarak kullanıyor.
+- Sonradan eklenen görsel listenin sonuna gelir; silinen bir görsel sıradan da düşer.
 - Etsy listing başına 10 görsele izin veriyor; 10'dan fazlası kabul edilmiyor.
 - Dosyalar `.data/templates/<blank-id>/` altında tutuluyor (gitignore'da). Dosya adları tarayıcıdan geldiği için yeniden kurgulanıyor — `../` içeren bir ad klasörün dışına çıkamaz.
 
@@ -151,7 +152,7 @@ Notlar:
 | `GET /api/etsy/status` | Bağlantı durumu, mağaza ve kargo profilleri (`DELETE` bağlantıyı keser) |
 | `GET /api/etsy/taxonomy` | Etsy kategori ağacı (Clothing dalı, günlük cache) |
 | `POST /api/etsy/publish` | Listing'i taslak olarak mağazaya gönderir |
-| `GET/POST/DELETE /api/etsy/templates?productId=` | Blank'in şablon görselleri |
+| `GET/POST/PATCH/DELETE /api/etsy/templates?productId=` | Blank'in şablon görselleri (PATCH sırayı değiştirir) |
 
 `productId` verilmezse veya tanınmazsa ilk ürün (Comfort Colors 1717) kullanılır. `spreadsheetId` tam URL de kabul eder.
 

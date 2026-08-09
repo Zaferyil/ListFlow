@@ -6,6 +6,7 @@ import {
   listTemplates,
   readTemplate,
   saveTemplate,
+  setOrder,
 } from "@/lib/etsy-templates";
 
 export const runtime = "nodejs";
@@ -78,6 +79,21 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Could not save the images.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
+}
+
+/** Reorders the gallery. The body is the full list of names, top first. */
+export async function PATCH(request: Request) {
+  const productId = productIdFrom(request.url);
+  if (!productId) {
+    return NextResponse.json({ error: "productId is required." }, { status: 400 });
+  }
+
+  const body = await request.json();
+  if (!Array.isArray(body?.order) || body.order.some((name: unknown) => typeof name !== "string")) {
+    return NextResponse.json({ error: "order must be a list of file names." }, { status: 400 });
+  }
+
+  return NextResponse.json({ images: await setOrder(productId, body.order) });
 }
 
 export async function DELETE(request: Request) {

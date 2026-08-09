@@ -752,3 +752,32 @@ button.linklike {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.templates li[draggable="true"] {
+  cursor: grab;
+}
+
+.templates li.dragging {
+  opacity: 0.45;
+  border-color: var(--accent);
+}
+
+.templates .grip {
+  flex: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  letter-spacing: -0.1em;
+}
+
+.template-actions {
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.template-actions button.ghost {
+  padding: 0.2rem 0.5rem;
+  line-height: 1.2;
+}

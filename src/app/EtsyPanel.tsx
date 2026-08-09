@@ -172,6 +172,7 @@ export function EtsyPanel({
   const [templates, setTemplates] = useState<TemplateImage[]>([]);
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   // The OAuth callback reports back through ?etsy=…; show it here rather than
   // leaving the seller to read it out of the address bar.
@@ -222,6 +223,26 @@ export function EtsyPanel({
     } finally {
       setUploading(false);
     }
+  }
+
+  /** Persists the arrangement, showing it immediately so dragging feels direct. */
+  async function reorder(from: number, to: number) {
+    if (from === to || to < 0 || to >= templates.length) return;
+
+    const next = [...templates];
+    next.splice(to, 0, ...next.splice(from, 1));
+    setTemplates(next);
+
+    const response = await fetch(
+      `/api/etsy/templates?productId=${encodeURIComponent(productId)}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ order: next.map((image) => image.name) }),
+      },
+    );
+    const body = await response.json();
+    if (body.images) setTemplates(body.images);
   }
 
   async function removeTemplate(name: string) {
@@ -569,7 +590,33 @@ export function EtsyPanel({
         {templates.length > 0 && (
           <ul className="templates">
             {templates.map((image, index) => (
-              <li key={image.name}>
+              <li
+                key={image.name}
+                draggable
+                className={draggingIndex === index ? "dragging" : ""}
+                onDragStart={(event) => {
+                  setDraggingIndex(index);
+                  event.dataTransfer.effectAllowed = "move";
+                  // Firefox starts no drag at all without payload.
+                  event.dataTransfer.setData("text/plain", image.name);
+                }}
+                onDragEnd={() => setDraggingIndex(null)}
+                onDragOver={(event) => {
+                  if (draggingIndex === null) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(event) => {
+                  if (draggingIndex === null) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void reorder(draggingIndex, index);
+                  setDraggingIndex(null);
+                }}
+              >
+                <span className="grip" aria-hidden="true">
+                  ⠿
+                </span>
                 <img
                   src={`/api/etsy/templates?productId=${encodeURIComponent(productId)}&file=${encodeURIComponent(image.name)}`}
                   alt=""
@@ -580,18 +627,40 @@ export function EtsyPanel({
                   </strong>
                   {formatSize(image.size)}
                 </span>
-                <button type="button" className="linklike" onClick={() => removeTemplate(image.name)}>
-                  Remove
-                </button>
+                <span className="template-actions">
+                  {/* Dragging is the quick way; the arrows make it precise and
+                      reachable without a mouse. */}
+                  <button
+                    type="button"
+                    className="ghost"
+                    aria-label={`Move ${image.name} up`}
+                    disabled={index === 0}
+                    onClick={() => reorder(index, index - 1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    aria-label={`Move ${image.name} down`}
+                    disabled={index === templates.length - 1}
+                    onClick={() => reorder(index, index + 1)}
+                  >
+                    ↓
+                  </button>
+                  <button type="button" className="linklike" onClick={() => removeTemplate(image.name)}>
+                    Remove
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
         )}
         {templateError && <div className="alert error">{templateError}</div>}
         <p className="hint">
-          Added to every listing for this blank — size chart, care card, colour chart. Uploaded in
-          the order shown, which is name order, so prefixing files 1-, 2-, 3- fixes the gallery.
-          Etsy allows 10 photos and shows the first as the search thumbnail.
+          Added to every listing for this blank — size chart, care card, colour chart. Uploaded top
+          to bottom; drag a row, or use the arrows, to rearrange. Etsy allows 10 photos and shows
+          the first as the search thumbnail.
         </p>
       </div>
 

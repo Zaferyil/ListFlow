@@ -58,14 +58,52 @@ function folderFor(productId: string): string {
 }
 
 /**
- * Sorted by name, which is also the order they are uploaded in — so numbering
- * files 1-size-chart.png, 2-care.png gives a predictable gallery.
+ * The gallery order, kept beside the images. It is a dotfile with a .json
+ * extension, so listTemplates — which only accepts image extensions — never
+ * mistakes it for a photo.
+ */
+const ORDER_FILE = ".order.json";
+
+async function readOrder(productId: string): Promise<string[]> {
+  try {
+    const raw = await readFile(join(folderFor(productId), ORDER_FILE), "utf8");
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((name): name is string => typeof name === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Stores the order the seller arranged. Names not on disk are dropped and
+ * files missing from the list keep their place at the end, so a stale order
+ * from a deleted photo cannot hide a real one.
+ */
+export async function setOrder(productId: string, names: string[]): Promise<TemplateImage[]> {
+  const folder = folderFor(productId);
+  await mkdir(folder, { recursive: true });
+  await writeFile(
+    join(folder, ORDER_FILE),
+    JSON.stringify(names.map(safeName), null, 2),
+  );
+  return listTemplates(productId);
+}
+
+/**
+ * In the order the seller arranged, which is also the upload order. Anything
+ * not yet ordered — a photo added since — follows in name order.
  */
 export async function listTemplates(productId: string): Promise<TemplateImage[]> {
   try {
     const folder = folderFor(productId);
-    const names = (await readdir(folder)).filter((name) => extensionOf(name) in ALLOWED_TYPES);
-    names.sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+    const present = (await readdir(folder)).filter((name) => extensionOf(name) in ALLOWED_TYPES);
+    const order = await readOrder(productId);
+
+    const ordered = order.filter((name) => present.includes(name));
+    const rest = present
+      .filter((name) => !ordered.includes(name))
+      .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+    const names = [...ordered, ...rest];
 
     return await Promise.all(
       names.map(async (name) => ({
