@@ -82,12 +82,105 @@ export interface ListingWarning {
   message: string;
 }
 
+/** Words that carry no search intent, so they don't count as opening keywords. */
+const STOPWORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "for",
+  "with",
+  "of",
+  "to",
+  "in",
+  "on",
+  "by",
+  "new",
+  "best",
+  "beautiful",
+  "unique",
+  "perfect",
+  "great",
+  "amazing",
+]);
+
+function words(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/**
+ * Etsy weights the opening of the title most heavily, so the first few words
+ * have to be the phrase a buyer would actually type. We can't read Etsy's
+ * index, but we can check the model's own judgement against itself: if the
+ * opening words are real search terms, they should also show up in the tags it
+ * chose. Fewer than two overlapping words means the title likely opens with
+ * branding or filler instead.
+ */
+function opensWithSearchPhrase(listing: Listing): boolean {
+  const opening = words(listing.title).slice(0, 4).filter((word) => !STOPWORDS.has(word));
+  if (opening.length === 0) return false;
+
+  const tagWords = new Set(listing.tags.flatMap(words));
+  const overlap = opening.filter((word) => tagWords.has(word)).length;
+
+  return overlap >= Math.min(2, opening.length);
+}
+
+/**
+ * Which of the required terms (e.g. a garment brand like "Comfort Colors") are
+ * missing from each field. Etsy treats title, description and tags as separate
+ * match surfaces, so a brand term has to appear in all three to be searchable.
+ */
+export function missingRequiredKeywords(
+  listing: Listing,
+  required: string[],
+): { keyword: string; fields: ("title" | "description" | "tags")[] }[] {
+  const results: { keyword: string; fields: ("title" | "description" | "tags")[] }[] = [];
+
+  for (const raw of required) {
+    const keyword = raw.trim().toLowerCase();
+    if (!keyword) continue;
+
+    const fields: ("title" | "description" | "tags")[] = [];
+    if (!listing.title.toLowerCase().includes(keyword)) fields.push("title");
+    if (!listing.description.toLowerCase().includes(keyword)) fields.push("description");
+    if (!listing.tags.some((tag) => tag.toLowerCase().includes(keyword))) fields.push("tags");
+
+    if (fields.length > 0) results.push({ keyword: raw.trim(), fields });
+  }
+
+  return results;
+}
+
 /**
  * Reports where the generated listing fell short of Etsy best practice, so the
  * UI can flag it instead of silently shipping a weak listing.
  */
-export function inspectListing(listing: Listing): ListingWarning[] {
+export function inspectListing(listing: Listing, requiredKeywords: string[] = []): ListingWarning[] {
   const warnings: ListingWarning[] = [];
+
+  const fieldLabels = { title: "baslik", description: "aciklama", tags: "etiketler" } as const;
+  for (const missing of missingRequiredKeywords(listing, requiredKeywords)) {
+    warnings.push({
+      field: "title",
+      message: `"${missing.keyword}" su alanlarda gecmiyor: ${missing.fields
+        .map((field) => fieldLabels[field])
+        .join(", ")}. Etsy bu alanlari ayri ayri esler.`,
+    });
+  }
+
+  if (!opensWithSearchPhrase(listing)) {
+    warnings.push({
+      field: "title",
+      message:
+        "Basligin ilk 3-4 kelimesi bir arama ifadesi gibi durmuyor. Etsy basligin basini en agir sekilde tartar — musterinin yazacagi ifadeyle baslatin.",
+    });
+  }
 
   if (listing.title.length < 60) {
     warnings.push({

@@ -10,6 +10,7 @@ const bodySchema = z.object({
   niche: z.string().trim().min(2, "Nis basligi cok kisa.").max(500),
   context: z.string().trim().max(2000).optional(),
   language: z.enum(["tr", "en"]).default("en"),
+  requiredKeywords: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
 });
 
 export async function POST(request: Request) {
@@ -19,10 +20,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { niche, context, language } = parsed.data;
-    const listing = await generateFromNiche(niche, { context, language });
+    const { niche, context, language, requiredKeywords } = parsed.data;
+    const listing = await generateFromNiche(niche, { context, language, requiredKeywords });
 
-    return NextResponse.json({ listing, warnings: inspectListing(listing) });
+    return NextResponse.json({ listing, warnings: inspectListing(listing, requiredKeywords) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Beklenmeyen bir hata olustu.";
     return NextResponse.json({ error: message }, { status: 500 });

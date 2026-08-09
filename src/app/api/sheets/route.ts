@@ -36,6 +36,7 @@ const generateSchema = z.object({
   spreadsheetId: z.string().trim().min(1),
   range: z.string().trim().min(1).default("Sheet1!A:B"),
   language: z.enum(["tr", "en"]).default("en"),
+  requiredKeywords: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
   limit: z.number().int().min(1).max(50).default(10),
   /** When true, results are written back into columns C:E of the same rows. */
   writeBack: z.boolean().default(false),
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { spreadsheetId, range, language, limit, writeBack } = parsed.data;
+    const { spreadsheetId, range, language, limit, writeBack, requiredKeywords } = parsed.data;
     const niches = (await readNiches(spreadsheetId, range)).slice(0, limit);
 
     if (niches.length === 0) {
@@ -81,12 +82,13 @@ export async function POST(request: Request) {
           const listing = await generateFromNiche(entry.niche, {
             language,
             context: entry.context,
+            requiredKeywords,
           });
           results[index] = {
             row: entry.row,
             niche: entry.niche,
             listing,
-            warnings: inspectListing(listing),
+            warnings: inspectListing(listing, requiredKeywords),
           };
         } catch (error) {
           results[index] = {

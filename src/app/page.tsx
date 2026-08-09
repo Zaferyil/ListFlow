@@ -31,29 +31,70 @@ async function errorFrom(response: Response): Promise<string> {
   return `Istek basarisiz (${response.status}).`;
 }
 
-function LanguageSelect({
-  value,
-  onChange,
+const COMFORT_COLORS = "Comfort Colors";
+
+function Settings({
+  language,
+  onLanguageChange,
+  comfortColors,
+  onComfortColorsChange,
+  extraKeywords,
+  onExtraKeywordsChange,
 }: {
-  value: Language;
-  onChange: (value: Language) => void;
+  language: Language;
+  onLanguageChange: (value: Language) => void;
+  comfortColors: boolean;
+  onComfortColorsChange: (value: boolean) => void;
+  extraKeywords: string;
+  onExtraKeywordsChange: (value: string) => void;
 }) {
   return (
-    <div className="field">
-      <label htmlFor="language">Listing dili</label>
-      <select
-        id="language"
-        value={value}
-        onChange={(event) => onChange(event.target.value as Language)}
-      >
-        <option value="en">Ingilizce (onerilen — Etsy alicilari)</option>
-        <option value="tr">Turkce metin + Ingilizce etiketler</option>
-      </select>
+    <div className="card">
+      <div className="field">
+        <label htmlFor="language">Listing dili</label>
+        <select
+          id="language"
+          value={language}
+          onChange={(event) => onLanguageChange(event.target.value as Language)}
+        >
+          <option value="en">Ingilizce (onerilen — Etsy alicilari)</option>
+          <option value="tr">Turkce metin + Ingilizce etiketler</option>
+        </select>
+      </div>
+
+      <label className="checkbox" style={{ marginBottom: "0.75rem" }}>
+        <input
+          type="checkbox"
+          checked={comfortColors}
+          onChange={(event) => onComfortColorsChange(event.target.checked)}
+        />
+        Comfort Colors urunu — &quot;{COMFORT_COLORS}&quot; baslikta, aciklamada ve etiketlerde
+        gecsin
+      </label>
+
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label htmlFor="required-keywords">Diger zorunlu kelimeler (virgulle ayirin)</label>
+        <input
+          id="required-keywords"
+          value={extraKeywords}
+          onChange={(event) => onExtraKeywordsChange(event.target.value)}
+          placeholder="Orn: Gildan 18000, oversized"
+        />
+        <p style={{ fontSize: "0.78rem", color: "var(--muted)", margin: "0.4rem 0 0" }}>
+          Her terim uc alanda da gecer. Basligin ilk 3-4 kelimesi yine musterinin arama ifadesi
+          olur — zorunlu kelimeler onun yerini almaz.
+        </p>
+      </div>
     </div>
   );
 }
 
-function DesignTab({ language }: { language: Language }) {
+interface TabProps {
+  language: Language;
+  requiredKeywords: string[];
+}
+
+function DesignTab({ language, requiredKeywords }: TabProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [context, setContext] = useState("");
@@ -82,6 +123,7 @@ function DesignTab({ language }: { language: Language }) {
     form.set("design", file);
     form.set("context", context);
     form.set("language", language);
+    form.set("requiredKeywords", requiredKeywords.join(","));
 
     try {
       const response = await fetch("/api/analyze", { method: "POST", body: form });
@@ -134,7 +176,7 @@ function DesignTab({ language }: { language: Language }) {
   );
 }
 
-function NicheTab({ language }: { language: Language }) {
+function NicheTab({ language, requiredKeywords }: TabProps) {
   const [niche, setNiche] = useState("");
   const [context, setContext] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
@@ -149,7 +191,7 @@ function NicheTab({ language }: { language: Language }) {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ niche, context, language }),
+        body: JSON.stringify({ niche, context, language, requiredKeywords }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       setResult(await response.json());
@@ -194,7 +236,7 @@ function NicheTab({ language }: { language: Language }) {
   );
 }
 
-function SheetTab({ language }: { language: Language }) {
+function SheetTab({ language, requiredKeywords }: TabProps) {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [range, setRange] = useState("Sheet1!A:B");
   const [limit, setLimit] = useState(5);
@@ -234,7 +276,14 @@ function SheetTab({ language }: { language: Language }) {
       const response = await fetch("/api/sheets", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ spreadsheetId, range, language, limit, writeBack }),
+        body: JSON.stringify({
+          spreadsheetId,
+          range,
+          language,
+          limit,
+          writeBack,
+          requiredKeywords,
+        }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       const body = await response.json();
@@ -334,6 +383,16 @@ function SheetTab({ language }: { language: Language }) {
 export default function Home() {
   const [tab, setTab] = useState<Tab>("design");
   const [language, setLanguage] = useState<Language>("en");
+  const [comfortColors, setComfortColors] = useState(false);
+  const [extraKeywords, setExtraKeywords] = useState("");
+
+  const requiredKeywords = [
+    ...(comfortColors ? [COMFORT_COLORS] : []),
+    ...extraKeywords
+      .split(",")
+      .map((keyword) => keyword.trim())
+      .filter(Boolean),
+  ].slice(0, 5);
 
   return (
     <main className="page">
@@ -357,13 +416,18 @@ export default function Home() {
         </button>
       </div>
 
-      <div className="card">
-        <LanguageSelect value={language} onChange={setLanguage} />
-      </div>
+      <Settings
+        language={language}
+        onLanguageChange={setLanguage}
+        comfortColors={comfortColors}
+        onComfortColorsChange={setComfortColors}
+        extraKeywords={extraKeywords}
+        onExtraKeywordsChange={setExtraKeywords}
+      />
 
-      {tab === "design" && <DesignTab language={language} />}
-      {tab === "niche" && <NicheTab language={language} />}
-      {tab === "sheet" && <SheetTab language={language} />}
+      {tab === "design" && <DesignTab language={language} requiredKeywords={requiredKeywords} />}
+      {tab === "niche" && <NicheTab language={language} requiredKeywords={requiredKeywords} />}
+      {tab === "sheet" && <SheetTab language={language} requiredKeywords={requiredKeywords} />}
     </main>
   );
 }

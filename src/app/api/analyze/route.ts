@@ -41,12 +41,19 @@ export async function POST(request: Request) {
     const data = Buffer.from(await file.arrayBuffer()).toString("base64");
     const language = form.get("language") === "tr" ? "tr" : ("en" satisfies Language);
 
+    // Sent as a comma-separated field so the form stays a flat multipart body.
+    const requiredKeywords = String(form.get("requiredKeywords") ?? "")
+      .split(",")
+      .map((keyword) => keyword.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+
     const listing = await generateFromDesign(
       { data, mediaType },
-      { language, context: String(form.get("context") ?? "") },
+      { language, context: String(form.get("context") ?? ""), requiredKeywords },
     );
 
-    return NextResponse.json({ listing, warnings: inspectListing(listing) });
+    return NextResponse.json({ listing, warnings: inspectListing(listing, requiredKeywords) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Beklenmeyen bir hata olustu.";
     return NextResponse.json({ error: message }, { status: 500 });
