@@ -747,3 +747,8 @@ button.linklike {
   color: var(--text);
   overflow-wrap: anywhere;
 }
+
+.dropzone.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

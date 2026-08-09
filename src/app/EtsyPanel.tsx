@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Listing } from "@/lib/etsy";
+import { FileDrop } from "./FileDrop";
 
 interface ShippingProfile {
   id: number;
@@ -200,13 +201,13 @@ export function EtsyPanel({
       .catch(() => setTemplates([]));
   }, [productId]);
 
-  async function addTemplates(files: FileList | null) {
-    if (!files || files.length === 0) return;
+  async function addTemplates(files: File[]) {
+    if (files.length === 0) return;
     setUploading(true);
     setTemplateError(null);
 
     const form = new FormData();
-    for (const file of Array.from(files)) form.append("images", file);
+    for (const file of files) form.append("images", file);
 
     try {
       const response = await fetch(
@@ -547,16 +548,23 @@ export function EtsyPanel({
 
       <div className="field">
         <label htmlFor="etsy-templates">Template photos</label>
-        <input
+        <FileDrop
           id="etsy-templates"
-          type="file"
           accept="image/png,image/jpeg,image/gif"
-          multiple
+          label={
+            uploading
+              ? "Uploading…"
+              : templates.length >= 10
+                ? "Ten photos already added"
+                : "Drop your template photos here"
+          }
+          hint={
+            templates.length >= 10
+              ? "Remove one to add another — Etsy allows ten per listing."
+              : `or click to browse — PNG, JPEG, GIF · ${10 - templates.length} slot${10 - templates.length === 1 ? "" : "s"} left`
+          }
           disabled={uploading || templates.length >= 10}
-          onChange={(event) => {
-            void addTemplates(event.target.files);
-            event.target.value = "";
-          }}
+          onFiles={(files) => void addTemplates(files)}
         />
         {templates.length > 0 && (
           <ul className="templates">

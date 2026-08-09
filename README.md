@@ -124,7 +124,7 @@ Panelde kategori, işlem profili (processing profile), kargo profili, fiyat, ade
 
 Her listing'e giren sabit görseller (beden tablosu, yıkama talimatı, renk kartı) blank başına bir kez yüklenir; taslak oluşturulduktan sonra otomatik eklenir.
 
-- Paneldeki **Template photos** alanından seçin. PNG, JPEG, GIF; dosya başına en fazla 20 MB.
+- Paneldeki **Template photos** alanına sürükleyip bırakın (ya da tıklayıp seçin). PNG, JPEG, GIF; dosya başına en fazla 20 MB.
 - **İsim sırasına göre** yüklenir, o yüzden dosyaları `1-`, `2-`, `3-` diye numaralayın. Etsy ilk görseli aramada çıkan küçük resim olarak kullanıyor.
 - Etsy listing başına 10 görsele izin veriyor; 10'dan fazlası kabul edilmiyor.
 - Dosyalar `.data/templates/<blank-id>/` altında tutuluyor (gitignore'da). Dosya adları tarayıcıdan geldiği için yeniden kurgulanıyor — `../` içeren bir ad klasörün dışına çıkamaz.
