@@ -15,11 +15,31 @@ Etsy listing otomasyonu. İki giriş yolu var:
 
 Bunu sadece prompt'a bırakmıyoruz. Etsy'nin indeksini okuyamayız ama modelin kendi kararını kendisiyle karşılaştırabiliriz: açılış kelimeleri gerçekten arama terimiyse, modelin seçtiği etiketlerde de geçmeleri gerekir. Geçmiyorsa UI uyarı gösterir.
 
-**Zorunlu kelimeler (ör. Comfort Colors).** Ayarlar bölümündeki Comfort Colors kutusunu işaretleyin veya kendi terimlerinizi virgülle girin. Her terim **başlıkta, açıklamada ve en az bir etikette** geçer — Etsy bu üç alanı ayrı ayrı eşler, sadece birinde geçen terim diğer ikisinde görünmez.
+**Zorunlu kelimeler.** Comfort Colors ürünlerinde marka adı otomatik zorunlu olur; kendi terimlerinizi de virgülle ekleyebilirsiniz. Her terim **başlıkta, açıklamada ve en az bir etikette** geçer — Etsy bu üç alanı ayrı ayrı eşler, sadece birinde geçen terim diğer ikisinde görünmez.
 
 Bir terim eksik çıkarsa uygulama eksiği açıkça belirten tek bir düzeltme turu atar. Terimi string olarak yamamak yerine yeniden ürettiriyoruz; yamamak anahtar kelime yığınına benzeyen bir başlık üretir. İkinci tur da tutmazsa sonuç yine dönüyor, eksik UI'da işaretleniyor.
 
-Comfort Colors için modele markanın ne olduğu (ağır gramajlı, garment-dyed ring-spun pamuk, rahat unisex kalıp) bilgi olarak veriliyor — aksi halde ya kumaşı uyduruyor ya da etrafından dolaşıyor.
+## Ürünler
+
+Üstteki butonlardan hangi blank'e bastığınızı seçiyorsunuz. Seçim üç sekmede de geçerli.
+
+| Buton | Kumaş | Gramaj |
+|---|---|---|
+| Comfort Colors 1717 | %100 US ring-spun pamuk, garment-dyed | 6.1 oz |
+| Gildan 64000 Softstyle | %100 preshrunk ring-spun pamuk | 4.5 oz |
+| Gildan 18500 Hoodie | %50/50 pamuk/polyester | 8.0 oz |
+| AWDis JH030 Sweatshirt | %80 ring-spun pamuk, %20 polyester | 280 gsm |
+| Gildan 2400 Long Sleeve | %100 pamuk preshrunk jersey | 6.0 oz |
+| Gildan 5000B Youth Tee | %100 pamuk | 5.3 oz |
+| Comfort Colors 9018 Youth | %100 ring-spun pamuk, garment-dyed | 6.1 oz |
+
+Bu veriler üreticinin kendi spec sheet'inden alındı, modelin hafızasından değil (kaynaklar `src/lib/products.ts` içinde her ürünün yanında). Kumaş içeriği, bir listing'de alıcının sizi bağlayabileceği tek şey — ve modelin en kolay, en inandırıcı şekilde uyduracağı detay. Prompt'a "bu spec'lere güvenebilirsin" deniyor; bu, "sana söylenmeyeni yazma" kuralını sadece bu alan için kaldırıyor.
+
+**Etsy'nin malzeme alanı üretilmiyor**, doğrudan katalogdan geliyor. Bilinen bir gerçeği modele yazdırmanın kazancı yok, yanlış yazma riski var.
+
+**Renk uyarısı önemli:** bu blank'lerin çoğunda kompozisyon renge göre değişiyor — Gildan 64000'de Sport Grey %90/10, heather renkler %35/65; 2400'de Dark Heather %50/50. Model bu yüzden "tüm renkler %100 pamuk" diyemiyor; ya standart renkleri anlatıp heather'ın blend olduğunu belirtiyor ya da kumaş içeriğini başlık/etiket dışında bırakıyor.
+
+Youth ürünlerde (5000B, 9018) metin çocuğa alan yetişkine yazılıyor — ebeveyn, büyükanne, öğretmen — ve anahtar kelimeler kids/youth diline göre kuruluyor.
 
 ### SVG dosyaları
 
@@ -52,7 +72,7 @@ Sheet düzeni:
 
 | A (niş) | B (bağlam, opsiyonel) | C | D | E |
 |---|---|---|---|---|
-| boho pampas wall art printable | dijital indirme, 24x36 | ← başlık | ← açıklama | ← etiketler |
+| retro sunset graphic tee | oversized, yaz koleksiyonu | ← başlık | ← açıklama | ← etiketler |
 
 C–E sütunları sadece "Sonuçları sheet'e geri yaz" işaretliyse doldurulur.
 
@@ -60,20 +80,22 @@ C–E sütunları sadece "Sonuçları sheet'e geri yaz" işaretliyse doldurulur.
 
 | Endpoint | Ne yapar |
 |---|---|
-| `POST /api/analyze` | multipart: `design` (görsel), `context`, `requiredKeywords` (virgülle) → tek listing |
-| `POST /api/generate` | JSON: `{ niche, context?, requiredKeywords? }` → tek listing |
+| `POST /api/analyze` | multipart: `design`, `context`, `requiredKeywords` (virgülle), `productId` → tek listing |
+| `POST /api/generate` | JSON: `{ niche, context?, requiredKeywords?, productId? }` → tek listing |
 | `GET /api/sheets?spreadsheetId=&range=` | Sheet'teki nişleri önizler |
-| `POST /api/sheets` | `{ spreadsheetId, range, limit, writeBack, requiredKeywords? }` → toplu üretim |
+| `POST /api/sheets` | `{ spreadsheetId, range, limit, writeBack, requiredKeywords?, productId? }` → toplu üretim |
 
-`requiredKeywords` en fazla 5 terim alır.
+`requiredKeywords` en fazla 5 terim alır. `productId` verilmezse veya tanınmazsa ilk ürün (Comfort Colors 1717) kullanılır.
 
 Toplu üretim aynı anda 3 istek çalıştırır (rate limit için). Bir satır başarısız olursa diğerleri devam eder; hata o satırın yanında görünür.
 
 ## Yapı
 
 ```
-src/lib/etsy.ts       Etsy limitleri, normalizasyon, zorunlu kelime + açılış ifadesi kontrolü
+src/lib/etsy.ts       Etsy limitleri, normalizasyon, zorunlu kelime + açılış ifadesi + dijital terim kontrolü
+src/lib/products.ts   Blank kataloğu (üretici spec'leri, kaynaklarıyla)
 src/lib/listing.ts    Prompt + structured output şeması
+src/lib/svg.ts        SVG → PNG rasterizer
 src/lib/sheets.ts     Google Sheets okuma/yazma
 src/lib/openai.ts    API istemcisi
 src/app/api/*         Route handler'lar
@@ -94,6 +116,6 @@ Varsayılan `gpt-5.4`. `OPENAI_MODEL` ile değiştirebilirsiniz — vision ve st
 
 ## Notlar
 
-- Model ölçü, kargo süresi, lisans koşulu gibi doğrulanamayan detayları uydurmaması için sistem prompt'unda kısıtlandı — bu alanları listelemeden önce kendiniz kontrol edin.
-- Listing çıktısı her zaman **İngilizce** ve ABD pazarına göre yazılır (Amerikan imlası, ABD beden/ölçü alışkanlıkları). Arayüz Türkçe.
+- Katalogdaki spec'ler dışında model ürün özelliği uyduramaz. Beden tablosu, baskı yöntemi ve kargo hâlâ bilinmiyor sayılır — listelemeden önce kendiniz ekleyin.
+- Arayüz ve listing çıktısı İngilizce; çıktı ABD pazarına göre yazılır (Amerikan imlası, ABD beden/ölçü alışkanlıkları).
 - Etiket sayısı 13'ün altında kalırsa, başlık kısa çıkarsa, başlık arama ifadesiyle başlamazsa veya zorunlu bir kelime üç alandan birinde eksikse UI uyarı gösterir.

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Listing, ListingWarning } from "@/lib/etsy";
+import { DEFAULT_PRODUCT_ID, findProduct, PRODUCTS } from "@/lib/products";
 import { ListingCard } from "./ListingCard";
 
 type Tab = "design" | "niche" | "sheet";
@@ -30,41 +31,56 @@ async function errorFrom(response: Response): Promise<string> {
   return `Request failed (${response.status}).`;
 }
 
-const COMFORT_COLORS = "Comfort Colors";
-
 function Settings({
-  comfortColors,
-  onComfortColorsChange,
+  productId,
+  onProductChange,
   extraKeywords,
   onExtraKeywordsChange,
 }: {
-  comfortColors: boolean;
-  onComfortColorsChange: (value: boolean) => void;
+  productId: string;
+  onProductChange: (value: string) => void;
   extraKeywords: string;
   onExtraKeywordsChange: (value: string) => void;
 }) {
+  const product = findProduct(productId);
+
   return (
     <div className="card">
-      <label className="checkbox" style={{ marginBottom: "0.75rem" }}>
-        <input
-          type="checkbox"
-          checked={comfortColors}
-          onChange={(event) => onComfortColorsChange(event.target.checked)}
-        />
-        Comfort Colors shirt — require &quot;{COMFORT_COLORS}&quot; in the title, description and tags
-      </label>
+      <div className="field">
+        <label>Blank</label>
+        <div className="choices">
+          {PRODUCTS.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className="choice"
+              aria-pressed={entry.id === productId}
+              onClick={() => onProductChange(entry.id)}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+        <p className="hint">
+          {product.composition} · {product.weight} · {product.fit}
+          {product.colorCaveat ? ` — ${product.colorCaveat}` : ""}
+        </p>
+      </div>
 
       <div className="field" style={{ marginBottom: 0 }}>
-        <label htmlFor="required-keywords">Other required keywords (comma separated)</label>
+        <label htmlFor="required-keywords">Extra required keywords (comma separated)</label>
         <input
           id="required-keywords"
           value={extraKeywords}
           onChange={(event) => onExtraKeywordsChange(event.target.value)}
-          placeholder="e.g. Gildan 18000, oversized"
+          placeholder="e.g. oversized, bachelorette"
         />
-        <p style={{ fontSize: "0.78rem", color: "var(--muted)", margin: "0.4rem 0 0" }}>
-          Each term is placed in all three fields. The first 3-4 words of the title stay the
-          buyer&apos;s search phrase — required keywords do not replace it.
+        <p className="hint">
+          {product.requiredKeywords.length > 0
+            ? `"${product.requiredKeywords.join('", "')}" is already required for this blank. `
+            : ""}
+          Each term goes in the title, description and tags. The first 3-4 words of the title stay
+          the buyer&apos;s search phrase.
         </p>
       </div>
     </div>
@@ -73,9 +89,10 @@ function Settings({
 
 interface TabProps {
   requiredKeywords: string[];
+  productId: string;
 }
 
-function DesignTab({ requiredKeywords }: TabProps) {
+function DesignTab({ requiredKeywords, productId }: TabProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [context, setContext] = useState("");
@@ -104,6 +121,7 @@ function DesignTab({ requiredKeywords }: TabProps) {
     form.set("design", file);
     form.set("context", context);
     form.set("requiredKeywords", requiredKeywords.join(","));
+    form.set("productId", productId);
 
     try {
       const response = await fetch("/api/analyze", { method: "POST", body: form });
@@ -156,7 +174,7 @@ function DesignTab({ requiredKeywords }: TabProps) {
   );
 }
 
-function NicheTab({ requiredKeywords }: TabProps) {
+function NicheTab({ requiredKeywords, productId }: TabProps) {
   const [niche, setNiche] = useState("");
   const [context, setContext] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
@@ -171,7 +189,7 @@ function NicheTab({ requiredKeywords }: TabProps) {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ niche, context, requiredKeywords }),
+        body: JSON.stringify({ niche, context, requiredKeywords, productId }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       setResult(await response.json());
@@ -216,7 +234,7 @@ function NicheTab({ requiredKeywords }: TabProps) {
   );
 }
 
-function SheetTab({ requiredKeywords }: TabProps) {
+function SheetTab({ requiredKeywords, productId }: TabProps) {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [range, setRange] = useState("Sheet1!A:B");
   const [limit, setLimit] = useState(5);
@@ -256,7 +274,7 @@ function SheetTab({ requiredKeywords }: TabProps) {
       const response = await fetch("/api/sheets", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ spreadsheetId, range, limit, writeBack, requiredKeywords }),
+        body: JSON.stringify({ spreadsheetId, range, limit, writeBack, requiredKeywords, productId }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       const body = await response.json();
@@ -355,16 +373,14 @@ function SheetTab({ requiredKeywords }: TabProps) {
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("design");
-  const [comfortColors, setComfortColors] = useState(false);
+  const [productId, setProductId] = useState(DEFAULT_PRODUCT_ID);
   const [extraKeywords, setExtraKeywords] = useState("");
 
-  const requiredKeywords = [
-    ...(comfortColors ? [COMFORT_COLORS] : []),
-    ...extraKeywords
-      .split(",")
-      .map((keyword) => keyword.trim())
-      .filter(Boolean),
-  ].slice(0, 5);
+  const requiredKeywords = extraKeywords
+    .split(",")
+    .map((keyword) => keyword.trim())
+    .filter(Boolean)
+    .slice(0, 5);
 
   return (
     <main className="page">
@@ -389,15 +405,15 @@ export default function Home() {
       </div>
 
       <Settings
-        comfortColors={comfortColors}
-        onComfortColorsChange={setComfortColors}
+        productId={productId}
+        onProductChange={setProductId}
         extraKeywords={extraKeywords}
         onExtraKeywordsChange={setExtraKeywords}
       />
 
-      {tab === "design" && <DesignTab requiredKeywords={requiredKeywords} />}
-      {tab === "niche" && <NicheTab requiredKeywords={requiredKeywords} />}
-      {tab === "sheet" && <SheetTab requiredKeywords={requiredKeywords} />}
+      {tab === "design" && <DesignTab requiredKeywords={requiredKeywords} productId={productId} />}
+      {tab === "niche" && <NicheTab requiredKeywords={requiredKeywords} productId={productId} />}
+      {tab === "sheet" && <SheetTab requiredKeywords={requiredKeywords} productId={productId} />}
     </main>
   );
 }

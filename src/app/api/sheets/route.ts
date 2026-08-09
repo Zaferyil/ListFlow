@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { inspectListing, type Listing } from "@/lib/etsy";
 import { generateFromNiche } from "@/lib/listing";
+import { allRequiredKeywords } from "@/lib/products";
 import { isSheetsConfigured, readNiches, writeListings } from "@/lib/sheets";
 
 export const runtime = "nodejs";
@@ -36,6 +37,7 @@ const generateSchema = z.object({
   spreadsheetId: z.string().trim().min(1),
   range: z.string().trim().min(1).default("Sheet1!A:B"),
   requiredKeywords: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
+  productId: z.string().trim().optional(),
   limit: z.number().int().min(1).max(50).default(10),
   /** When true, results are written back into columns C:E of the same rows. */
   writeBack: z.boolean().default(false),
@@ -61,7 +63,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { spreadsheetId, range, limit, writeBack, requiredKeywords } = parsed.data;
+    const { spreadsheetId, range, limit, writeBack, requiredKeywords, productId } = parsed.data;
     const niches = (await readNiches(spreadsheetId, range)).slice(0, limit);
 
     if (niches.length === 0) {
@@ -81,12 +83,13 @@ export async function POST(request: Request) {
           const listing = await generateFromNiche(entry.niche, {
             context: entry.context,
             requiredKeywords,
+            productId,
           });
           results[index] = {
             row: entry.row,
             niche: entry.niche,
             listing,
-            warnings: inspectListing(listing, requiredKeywords),
+            warnings: inspectListing(listing, allRequiredKeywords(productId, requiredKeywords)),
           };
         } catch (error) {
           results[index] = {

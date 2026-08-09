@@ -1,32 +1,29 @@
 import type OpenAI from "openai";
 import { getClient, MODEL } from "./openai";
 import { ETSY_LIMITS, type Listing, missingRequiredKeywords, normalizeListing } from "./etsy";
+import { DEFAULT_PRODUCT_ID, findProduct, productFacts, type Product } from "./products";
 
 type UserContent = OpenAI.Chat.Completions.ChatCompletionContentPart;
 
 export interface GenerateOptions {
-  /** Extra context the seller typed in — shop style, target buyer, product type. */
+  /** Extra context the seller typed in — shop style, target buyer, colorway. */
   context?: string;
-  /**
-   * Terms that must appear in the title, the description and at least one tag —
-   * typically a garment brand such as "Comfort Colors" that buyers search by.
-   */
+  /** Which blank the design is printed on. Defaults to the first in the catalog. */
+  productId?: string;
+  /** Extra terms the seller wants in the title, description and tags. */
   requiredKeywords?: string[];
 }
 
-/**
- * Product facts for brands we support explicitly. Without these the model
- * either guesses at the garment or writes around it; both hurt the listing.
- */
-const BRAND_NOTES: Record<string, string> = {
-  "comfort colors":
-    'Comfort Colors is a garment brand known for heavyweight, garment-dyed ring-spun cotton tees with a relaxed unisex fit and soft, lived-in colour. Buyers search for it by name ("comfort colors shirt", "comfort colors tee"), so treat it as a keyword, not just a label.',
-};
-
-function brandNotesFor(keywords: string[]): string[] {
-  return keywords
-    .map((keyword) => BRAND_NOTES[keyword.trim().toLowerCase()])
-    .filter((note): note is string => Boolean(note));
+/** The blank's own brand terms plus anything the seller added. */
+function keywordsFor(product: Product, extra: string[] | undefined): string[] {
+  const all = [...product.requiredKeywords, ...(extra ?? [])].map((k) => k.trim()).filter(Boolean);
+  const seen = new Set<string>();
+  return all.filter((keyword) => {
+    const key = keyword.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 const LISTING_SCHEMA = {
@@ -46,12 +43,6 @@ const LISTING_SCHEMA = {
       items: { type: "string" },
       description: `Exactly ${ETSY_LIMITS.maxTags} Etsy tags, each at most ${ETSY_LIMITS.tagMaxChars} characters. Prefer multi-word long-tail phrases that a buyer would actually type. No duplicated phrases, no single generic words like "gift", and never a file format or download phrase.`,
     },
-    materials: {
-      type: "array",
-      items: { type: "string" },
-      description:
-        "Up to 13 garment materials and construction details (e.g. 'cotton', 'ring-spun cotton', 'garment-dyed', 'screen print', 'DTG print'). Never a file format.",
-    },
     category: {
       type: "string",
       description:
@@ -63,20 +54,25 @@ const LISTING_SCHEMA = {
         "Two or three sentences for the seller explaining the keyword strategy behind these choices, and anything they should verify manually.",
     },
   },
-  required: ["title", "description", "tags", "materials", "category", "notes"],
+  required: ["title", "description", "tags", "category", "notes"],
   additionalProperties: false,
 } as const;
 
-function systemPrompt(requiredKeywords: string[]): string {
+function systemPrompt(product: Product, requiredKeywords: string[]): string {
   const lines = [
     "You are an Etsy SEO specialist who writes listings that rank in Etsy search and convert browsers into buyers.",
     "You write for the US Etsy market: American English spelling, American sizing conventions, and phrasing a US buyer would use.",
     "",
-    "THE PRODUCT IS ALWAYS A PHYSICAL PRINTED T-SHIRT that the seller prints and ships. It is never a digital file.",
-    "- When you are shown a design, that design is what gets printed on the shirt. The listing sells the finished shirt, not the artwork and not the file.",
+    `THE PRODUCT IS ALWAYS A PHYSICAL PRINTED ${product.garment.toUpperCase()} that the seller prints and ships. It is never a digital file.`,
+    `- When you are shown a design, that design is what gets printed on the ${product.garment}. The listing sells the finished garment, not the artwork and not the file.`,
     "- Never write the listing as a digital download, printable, clipart, cut file, or sublimation file, and never say a file is delivered or downloaded.",
     "- Never put a file format or download phrase in the title, the tags, or the materials: no PNG, SVG, JPG, PDF, EPS, DXF, 'digital download', 'instant download', 'printable', 'downloadable', 'clipart', 'cut file'. A buyer searching those wants a file, not your shirt, so they are the wrong traffic.",
     "- Write for someone who will wear it or gift it. Cover fit, feel, and occasion instead of file contents.",
+    "",
+    "The blank is fixed. These are manufacturer specifications, verified — you may state them as fact, and you should, because fabric and fit are what a buyer compares between listings:",
+    ...productFacts(product),
+    `- Call the garment a ${product.garment} in the copy. Do not call it a tee if it is a sweatshirt, or the other way round.`,
+    "- Do not go beyond these facts. Sizing charts, exact colour names, print method and shipping are still unknown unless the seller told you.",
     "",
     "Rules you must follow:",
     `- Title: at most ${ETSY_LIMITS.titleMaxChars} characters, and aim for 110-140 to use the space Etsy gives you.`,
@@ -85,7 +81,7 @@ function systemPrompt(requiredKeywords: string[]): string {
     "- The opening phrase must also appear among the tags. If you would not use it as a tag, it is not a search phrase and does not belong at the front of the title.",
     `- Tags: exactly ${ETSY_LIMITS.maxTags} tags, each at most ${ETSY_LIMITS.tagMaxChars} characters.`,
     "- Tags must be long-tail buyer phrases, not one-word categories, and must not simply repeat each other.",
-    "- Never invent product attributes you cannot see or were not told. If a detail is unknown, describe the printed design instead of guessing at the blank brand, fabric weight, sizing chart, or shipping.",
+    "- Beyond the specifications above, never invent product attributes. If a detail is unknown, describe the printed design instead of guessing at the sizing chart, print method, or shipping.",
     "- Do not promise delivery times or refunds.",
   ];
 
@@ -99,18 +95,17 @@ function systemPrompt(requiredKeywords: string[]): string {
       "- Keep the term readable in context — work it into a natural phrase (e.g. a tag like 'comfort colors tee'), do not bolt it on as a bare label.",
       "- These terms are additional to, not a replacement for, the search phrase that opens the title.",
     );
-
-    const notes = brandNotesFor(requiredKeywords);
-    if (notes.length > 0) {
-      lines.push("", "Product facts you may rely on:", ...notes.map((note) => `- ${note}`));
-    }
   }
 
   return lines.join("\n");
 }
 
 /** One structured-output call. */
-async function callModel(content: UserContent[], requiredKeywords: string[]): Promise<Listing> {
+async function callModel(
+  content: UserContent[],
+  product: Product,
+  requiredKeywords: string[],
+): Promise<Listing> {
   const response = await getClient().chat.completions.create({
     model: MODEL,
     max_completion_tokens: 4000,
@@ -119,7 +114,7 @@ async function callModel(content: UserContent[], requiredKeywords: string[]): Pr
       json_schema: { name: "etsy_listing", strict: true, schema: LISTING_SCHEMA },
     },
     messages: [
-      { role: "system", content: systemPrompt(requiredKeywords) },
+      { role: "system", content: systemPrompt(product, requiredKeywords) },
       { role: "user", content },
     ],
   });
@@ -137,7 +132,12 @@ async function callModel(content: UserContent[], requiredKeywords: string[]): Pr
     throw new Error("The model returned an empty response. Try again.");
   }
 
-  return normalizeListing(JSON.parse(message.content) as Listing);
+  const generated = JSON.parse(message.content) as Omit<Listing, "materials">;
+
+  // Materials are verified manufacturer facts, so they come from the catalog
+  // rather than from generation — there is nothing here for a model to get right
+  // that it could not also get wrong.
+  return normalizeListing({ ...generated, materials: product.materials });
 }
 
 /**
@@ -150,9 +150,10 @@ async function requestListing(
   content: UserContent[],
   options: GenerateOptions,
 ): Promise<Listing> {
-  const requiredKeywords = (options.requiredKeywords ?? []).map((k) => k.trim()).filter(Boolean);
+  const product = findProduct(options.productId ?? DEFAULT_PRODUCT_ID);
+  const requiredKeywords = keywordsFor(product, options.requiredKeywords);
 
-  const listing = await callModel(content, requiredKeywords);
+  const listing = await callModel(content, product, requiredKeywords);
 
   const missing = missingRequiredKeywords(listing, requiredKeywords);
   if (missing.length === 0) return listing;
@@ -176,6 +177,7 @@ async function requestListing(
         ].join("\n"),
       },
     ],
+    product,
     requiredKeywords,
   );
 
@@ -189,8 +191,9 @@ async function requestListing(
 /** Generates a listing from a niche keyword pulled out of a Google Sheet. */
 export function generateFromNiche(niche: string, options: GenerateOptions = {}): Promise<Listing> {
   const extra = options.context?.trim();
+  const product = findProduct(options.productId ?? DEFAULT_PRODUCT_ID);
   const prompt = [
-    `Write an Etsy listing for a printed t-shirt in this niche:\n\n${niche}`,
+    `Write an Etsy listing for a printed ${product.garment} in this niche:\n\n${niche}`,
     extra ? `\n\nSeller context:\n${extra}` : "",
   ].join("");
 
@@ -216,11 +219,11 @@ export function generateFromDesign(
 ): Promise<Listing> {
   const extra = options.context?.trim();
   const prompt = [
-    "This design is printed on a t-shirt. Write the Etsy listing for that shirt.",
+    `This design is printed on a ${findProduct(options.productId ?? DEFAULT_PRODUCT_ID).garment}. Write the Etsy listing for that garment.`,
     "Describe what you actually see in the design — subject, wording, style, colour palette, typography, mood — and build the keywords from that.",
-    "The design is the shirt's selling point, but the product being sold is the shirt itself.",
+    "The design is the selling point, but the product being sold is the garment itself.",
     design.flattenedBackground
-      ? `\nThis image was converted from a vector file with a transparent background. The flat ${design.flattenedBackground} backdrop was added by that conversion — it is not part of the design. Ignore it entirely: do not mention it, do not treat it as a colour of the artwork, and assume the design is printed on the shirt colour the seller chooses.`
+      ? `\nThis image was converted from a vector file with a transparent background. The flat ${design.flattenedBackground} backdrop was added by that conversion — it is not part of the design. Ignore it entirely: do not mention it, do not treat it as a colour of the artwork, and assume the design is printed on the garment colour the seller chooses.`
       : "",
     extra ? `\nSeller context:\n${extra}` : "",
   ].join("\n");
