@@ -3,7 +3,7 @@
 Etsy listing otomasyonu. İki giriş yolu var:
 
 1. **Tasarım yükle** — Model görseli analiz eder (konu, stil, renk paleti, tipografi) ve buradan başlık/açıklama/etiket üretir. PNG, JPEG, WebP, GIF ve SVG kabul eder.
-2. **Google Sheet** — A sütunundaki niş başlıklarını çeker, toplu üretir, isterseniz sonuçları aynı satırlara geri yazar.
+2. **Google Sheet** — Status'ü `New` olan satırları çeker, toplu üretir, sonuçları aynı satıra yazıp Status'ü `Done` yapar.
 
 Üçüncü bir sekme (Tek niş) sheet'e gerek kalmadan elle niş girmek için.
 
@@ -68,15 +68,22 @@ Sadece sheet sekmesi için gerekli; tasarım ve tek-niş sekmeleri onsuz çalı�
 1. Google Cloud'da bir proje açın, **Google Sheets API**'yi etkinleştirin.
 2. Bir **servis hesabı** oluşturun ve JSON anahtarını indirin.
 3. JSON'daki `client_email` ve `private_key` değerlerini `.env.local` içine yazın (`GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`).
-4. Sheet'i o servis hesabı e-postasıyla paylaşın — geri yazma istiyorsanız **Editor**, sadece okuma için **Viewer** yeterli.
+4. Sheet'i o servis hesabı e-postasıyla **Editor** olarak paylaşın — Viewer yetkisi geri yazmaya yetmez.
 
-Sheet düzeni:
+**Akış:** Status'ü `New` (veya boş) olan satırlar çekilir, listing üretilir, sonuçlar yazılır ve Status `Done` olur. `Done` veya başka bir değer taşıyan satırlara dokunulmaz — yani aynı butona tekrar basmak üretilmiş satırları yeniden üretmez.
 
-| A (niş) | B (bağlam, opsiyonel) | C | D | E |
-|---|---|---|---|---|
-| retro sunset graphic tee | oversized, yaz koleksiyonu | ← başlık | ← açıklama | ← etiketler |
+Sütunlar **başlık adından** bulunur, harf sırasından değil. Örnek düzen:
 
-C–E sütunları sadece "Sonuçları sheet'e geri yaz" işaretliyse doldurulur.
+| A | B | C | D | E | F | G |
+|---|---|---|---|---|---|---|
+| Niche | Status | Design_URL | Etsy_URL | SEO_Title | Description | Tags |
+| ← girdi | ← New/Done | dokunulmaz | dokunulmaz | ← yazılır | ← yazılır | ← yazılır |
+
+Başlık isimleri esnek (`Niş`/`Durum`/`Başlık` gibi Türkçe karşılıklar da tanınır) ve tanınmayan sütunlara dokunulmaz. **Check sheet** butonu üretmeden önce hangi sütunu ne olarak algıladığını ve kaç satırın `New` olduğunu gösterir.
+
+Başlık satırı hiç tanınmazsa sütunlar soldan sağa varsayılır (A niş, B status, C/D/E çıktı). Bir tane bile tanınan başlık varsa satır 1 başlık kabul edilir — aksi halde başlık satırı niş sanılıp "Niche" için listing üretilir ve Done işaretlenirdi.
+
+Üretimi başarısız olan satır `New` kalır, sonraki çalıştırmada tekrar denenir. **Max rows per run** sınırı aşılırsa kalan satır sayısı bildirilir; butona tekrar basarak devam edersiniz.
 
 ## API
 
@@ -84,8 +91,8 @@ C–E sütunları sadece "Sonuçları sheet'e geri yaz" işaretliyse doldurulur.
 |---|---|
 | `POST /api/analyze` | multipart: `design`, `context`, `requiredKeywords` (virgülle), `productId` → tek listing |
 | `POST /api/generate` | JSON: `{ niche, context?, requiredKeywords?, productId? }` → tek listing |
-| `GET /api/sheets?spreadsheetId=&range=` | Sheet'teki nişleri önizler |
-| `POST /api/sheets` | `{ spreadsheetId, range, limit, writeBack, requiredKeywords?, productId? }` → toplu üretim |
+| `GET /api/sheets?spreadsheetId=&sheetName=` | Sütun eşleşmesini ve `New` satır sayısını döner |
+| `POST /api/sheets` | `{ spreadsheetId, sheetName?, limit, writeBack, requiredKeywords?, productId? }` → `New` satırları üretir |
 
 `requiredKeywords` en fazla 5 terim alır. `productId` verilmezse veya tanınmazsa ilk ürün (Comfort Colors 1717) kullanılır.
 

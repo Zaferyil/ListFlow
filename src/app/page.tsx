@@ -209,11 +209,45 @@ function NicheTab({ requiredKeywords, productId }: TabProps) {
   );
 }
 
+interface LayoutInfo {
+  sheetName: string;
+  fromHeaders: boolean;
+  niche: string;
+  status: string | null;
+  title: string;
+  description: string;
+  tags: string;
+}
+
+function LayoutSummary({ layout, pending, skipped }: { layout: LayoutInfo; pending: number; skipped?: number }) {
+  return (
+    <div className="alert info">
+      <strong>{pending} row{pending === 1 ? "" : "s"} marked New</strong>
+      {typeof skipped === "number" && skipped > 0 ? ` · ${skipped} already done` : ""}
+      <br />
+      Reading niche from <code>{layout.niche}</code>
+      {layout.status ? (
+        <>
+          , status from <code>{layout.status}</code>
+        </>
+      ) : (
+        <> · no status column found, so every row counts as New</>
+      )}
+      . Writing title to <code>{layout.title}</code>, description to <code>{layout.description}</code>,
+      tags to <code>{layout.tags}</code>.
+      {!layout.fromHeaders && " No header row recognised — columns assumed left to right."}
+    </div>
+  );
+}
+
 function SheetTab({ requiredKeywords, productId }: TabProps) {
   const [spreadsheetId, setSpreadsheetId] = useState("");
-  const [range, setRange] = useState("Sheet1!A:B");
+  const [sheetName, setSheetName] = useState("Nis Listesi");
   const [limit, setLimit] = useState(5);
-  const [writeBack, setWriteBack] = useState(false);
+  const [writeBack, setWriteBack] = useState(true);
+  const [layout, setLayout] = useState<LayoutInfo | null>(null);
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
+  const [skipped, setSkipped] = useState<number | undefined>(undefined);
   const [rows, setRows] = useState<BatchRow[]>([]);
   const [writeInfo, setWriteInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -223,17 +257,15 @@ function SheetTab({ requiredKeywords, productId }: TabProps) {
     setLoading(true);
     setError(null);
     setWriteInfo(null);
+    setRows([]);
     try {
-      const params = new URLSearchParams({ spreadsheetId, range });
+      const params = new URLSearchParams({ spreadsheetId, sheetName });
       const response = await fetch(`/api/sheets?${params}`);
       if (!response.ok) throw new Error(await errorFrom(response));
       const body = await response.json();
-      setRows(
-        (body.niches as { row: number; niche: string }[]).map((entry) => ({
-          row: entry.row,
-          niche: entry.niche,
-        })),
-      );
+      setLayout(body.layout as LayoutInfo);
+      setPendingCount((body.pending as unknown[]).length);
+      setSkipped(body.skipped as number);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unknown error.");
     } finally {
@@ -249,15 +281,31 @@ function SheetTab({ requiredKeywords, productId }: TabProps) {
       const response = await fetch("/api/sheets", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ spreadsheetId, range, limit, writeBack, requiredKeywords, productId }),
+        body: JSON.stringify({
+          spreadsheetId,
+          sheetName,
+          limit,
+          writeBack,
+          requiredKeywords,
+          productId,
+        }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       const body = await response.json();
       setRows(body.results as BatchRow[]);
+      setLayout(body.layout as LayoutInfo);
+      setPendingCount(null);
+
       if (body.writeError) {
         setWriteInfo(`Could not write to the sheet: ${body.writeError}`);
       } else if (writeBack) {
-        setWriteInfo(`Wrote ${body.writtenRows} rows to the sheet (columns C:E).`);
+        const remaining = body.remaining as number;
+        setWriteInfo(
+          `Wrote ${body.writtenRows} rows and marked them Done.` +
+            (remaining > 0 ? ` ${remaining} still marked New — run again to continue.` : ""),
+        );
+      } else {
+        setWriteInfo("Dry run — the sheet was not touched.");
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unknown error.");
@@ -281,15 +329,15 @@ function SheetTab({ requiredKeywords, productId }: TabProps) {
 
         <div className="row">
           <div className="field">
-            <label htmlFor="sheet-range">Range</label>
+            <label htmlFor="sheet-name">Tab name</label>
             <input
-              id="sheet-range"
-              value={range}
-              onChange={(event) => setRange(event.target.value)}
+              id="sheet-name"
+              value={sheetName}
+              onChange={(event) => setSheetName(event.target.value)}
             />
           </div>
           <div className="field">
-            <label htmlFor="sheet-limit">How many niches</label>
+            <label htmlFor="sheet-limit">Max rows per run</label>
             <input
               id="sheet-limit"
               type="number"
@@ -307,26 +355,30 @@ function SheetTab({ requiredKeywords, productId }: TabProps) {
             checked={writeBack}
             onChange={(event) => setWriteBack(event.target.checked)}
           />
-          Write results back to the sheet (C: title, D: description, E: tags)
+          Write results back and set Status to Done
         </label>
 
         <div style={{ display: "flex", gap: "0.6rem" }}>
           <button className="ghost" onClick={preview} disabled={!spreadsheetId || loading}>
-            Preview niches
+            Check sheet
           </button>
           <button className="primary" onClick={generate} disabled={!spreadsheetId || loading}>
-            {loading ? "Working…" : "Generate batch"}
+            {loading ? "Working…" : "Generate New rows"}
           </button>
         </div>
 
-        <p style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: 0 }}>
-          Column A is the niche, column B (optional) is per-row context. Remember to share the
-          sheet with your service account email.
+        <p className="hint" style={{ marginBottom: 0 }}>
+          Only rows whose Status is <code>New</code> (or blank) are processed; they are set to{" "}
+          <code>Done</code> afterwards. Columns are matched by header name. Share the sheet with your
+          service account as an <strong>Editor</strong> — Viewer is not enough to write back.
         </p>
       </div>
 
       {error && <div className="alert error">{error}</div>}
       {writeInfo && <div className="alert warn">{writeInfo}</div>}
+      {layout && pendingCount !== null && (
+        <LayoutSummary layout={layout} pending={pendingCount} skipped={skipped} />
+      )}
 
       {rows.map((entry) =>
         entry.listing ? (
@@ -337,8 +389,8 @@ function SheetTab({ requiredKeywords, productId }: TabProps) {
             heading={`Row ${entry.row} — ${entry.niche}`}
           />
         ) : (
-          <div key={entry.row} className={entry.error ? "alert error" : "card"}>
-            {entry.error ? `Row ${entry.row} — ${entry.niche}: ${entry.error}` : `Row ${entry.row} — ${entry.niche}`}
+          <div key={entry.row} className="alert error">
+            {`Row ${entry.row} — ${entry.niche}: ${entry.error}`}
           </div>
         ),
       )}

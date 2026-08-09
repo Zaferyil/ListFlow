@@ -3,7 +3,14 @@ import { z } from "zod";
 import { inspectListing, type Listing } from "@/lib/etsy";
 import { generateFromNiche } from "@/lib/listing";
 import { allRequiredKeywords } from "@/lib/products";
-import { isSheetsConfigured, readNiches, writeListings } from "@/lib/sheets";
+import {
+  columnLetter,
+  DEFAULT_SHEET_NAME,
+  isSheetsConfigured,
+  readNiches,
+  type SheetLayout,
+  writeListings,
+} from "@/lib/sheets";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -11,7 +18,20 @@ export const maxDuration = 300;
 /** How many listings to generate in parallel — keeps us inside API rate limits. */
 const CONCURRENCY = 3;
 
-/** Reads the niche list so the UI can show it before generating anything. */
+/** The detected column mapping, as letters, so the UI can show what it found. */
+function describeLayout(layout: SheetLayout) {
+  return {
+    sheetName: layout.sheetName,
+    fromHeaders: layout.fromHeaders,
+    niche: columnLetter(layout.nicheColumn),
+    status: layout.statusColumn === null ? null : columnLetter(layout.statusColumn),
+    title: columnLetter(layout.titleColumn),
+    description: columnLetter(layout.descriptionColumn),
+    tags: columnLetter(layout.tagsColumn),
+  };
+}
+
+/** Previews the sheet so the seller can check the mapping before spending calls. */
 export async function GET(request: Request) {
   try {
     if (!isSheetsConfigured()) {
@@ -20,13 +40,19 @@ export async function GET(request: Request) {
 
     const params = new URL(request.url).searchParams;
     const spreadsheetId = params.get("spreadsheetId") ?? process.env.GOOGLE_SHEET_ID;
-    const range = params.get("range") ?? process.env.GOOGLE_SHEET_RANGE ?? "Sheet1!A:B";
+    const sheetName = params.get("sheetName") || process.env.GOOGLE_SHEET_NAME || DEFAULT_SHEET_NAME;
 
     if (!spreadsheetId) {
       return NextResponse.json({ error: "spreadsheetId is required." }, { status: 400 });
     }
 
-    return NextResponse.json({ niches: await readNiches(spreadsheetId, range), range });
+    const { layout, rows } = await readNiches(spreadsheetId, sheetName);
+
+    return NextResponse.json({
+      layout: describeLayout(layout),
+      pending: rows.filter((row) => row.pending).map(({ row, niche, status }) => ({ row, niche, status })),
+      skipped: rows.filter((row) => !row.pending).length,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not read the sheet.";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -35,12 +61,12 @@ export async function GET(request: Request) {
 
 const generateSchema = z.object({
   spreadsheetId: z.string().trim().min(1),
-  range: z.string().trim().min(1).default("Sheet1!A:B"),
+  sheetName: z.string().trim().min(1).default(DEFAULT_SHEET_NAME),
   requiredKeywords: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
   productId: z.string().trim().optional(),
   limit: z.number().int().min(1).max(50).default(10),
-  /** When true, results are written back into columns C:E of the same rows. */
-  writeBack: z.boolean().default(false),
+  /** Off runs a dry pass: listings come back, the sheet is left untouched. */
+  writeBack: z.boolean().default(true),
 });
 
 interface BatchResult {
@@ -51,7 +77,10 @@ interface BatchResult {
   error?: string;
 }
 
-/** Generates listings for the sheet's niches, optionally writing them back. */
+/**
+ * Generates listings for every row still marked New, writes them into the
+ * output columns, and flips those rows to Done.
+ */
 export async function POST(request: Request) {
   try {
     if (!isSheetsConfigured()) {
@@ -63,28 +92,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { spreadsheetId, range, limit, writeBack, requiredKeywords, productId } = parsed.data;
-    const niches = (await readNiches(spreadsheetId, range)).slice(0, limit);
+    const { spreadsheetId, sheetName, limit, writeBack, requiredKeywords, productId } = parsed.data;
+    const { layout, rows } = await readNiches(spreadsheetId, sheetName);
+    const pending = rows.filter((row) => row.pending).slice(0, limit);
 
-    if (niches.length === 0) {
-      return NextResponse.json({ error: "No niches found in the sheet." }, { status: 404 });
+    if (pending.length === 0) {
+      return NextResponse.json(
+        {
+          error: rows.length
+            ? `No rows are marked New in "${sheetName}" — all ${rows.length} rows are already done.`
+            : `No niches found in "${sheetName}".`,
+        },
+        { status: 404 },
+      );
     }
 
-    const results: BatchResult[] = new Array(niches.length);
+    const results: BatchResult[] = new Array(pending.length);
     let cursor = 0;
 
     // A shared cursor gives us a fixed-size worker pool without pulling in a
     // dependency: each worker takes the next index until the list is drained.
     async function worker() {
-      while (cursor < niches.length) {
+      while (cursor < pending.length) {
         const index = cursor++;
-        const entry = niches[index];
+        const entry = pending[index];
         try {
-          const listing = await generateFromNiche(entry.niche, {
-            context: entry.context,
-            requiredKeywords,
-            productId,
-          });
+          const listing = await generateFromNiche(entry.niche, { requiredKeywords, productId });
           results[index] = {
             row: entry.row,
             niche: entry.niche,
@@ -101,22 +134,21 @@ export async function POST(request: Request) {
       }
     }
 
-    await Promise.all(
-      Array.from({ length: Math.min(CONCURRENCY, niches.length) }, () => worker()),
-    );
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pending.length) }, () => worker()));
 
     let writtenRows = 0;
     let writeError: string | undefined;
 
     if (writeBack) {
+      // Only rows that produced a listing are written, so a failed row keeps
+      // its New status and gets picked up on the next run.
       const successful = results.filter(
         (result): result is BatchResult & { listing: Listing } => Boolean(result.listing),
       );
       try {
-        const sheetName = range.includes("!") ? range.split("!")[0] : "Sheet1";
         await writeListings(
           spreadsheetId,
-          sheetName,
+          layout,
           successful.map((result) => ({
             row: result.row,
             title: result.listing.title,
@@ -131,7 +163,13 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ results, writtenRows, writeError });
+    return NextResponse.json({
+      results,
+      writtenRows,
+      writeError,
+      layout: describeLayout(layout),
+      remaining: rows.filter((row) => row.pending).length - pending.length,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Something went wrong.";
     return NextResponse.json({ error: message }, { status: 500 });
