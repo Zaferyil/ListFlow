@@ -6,6 +6,7 @@ import { allRequiredKeywords } from "@/lib/products";
 import {
   columnLetter,
   DEFAULT_SHEET_NAME,
+  extractSpreadsheetId,
   isSheetsConfigured,
   readNiches,
   type SheetLayout,
@@ -39,7 +40,8 @@ export async function GET(request: Request) {
     }
 
     const params = new URL(request.url).searchParams;
-    const spreadsheetId = params.get("spreadsheetId") ?? process.env.GOOGLE_SHEET_ID;
+    const raw = params.get("spreadsheetId") ?? process.env.GOOGLE_SHEET_ID;
+    const spreadsheetId = raw ? extractSpreadsheetId(raw) : undefined;
     const sheetName = params.get("sheetName") || process.env.GOOGLE_SHEET_NAME || DEFAULT_SHEET_NAME;
 
     if (!spreadsheetId) {
@@ -60,7 +62,8 @@ export async function GET(request: Request) {
 }
 
 const generateSchema = z.object({
-  spreadsheetId: z.string().trim().min(1),
+  // Accepts the full browser URL as well as a bare ID.
+  spreadsheetId: z.string().trim().min(1).transform(extractSpreadsheetId),
   sheetName: z.string().trim().min(1).default(DEFAULT_SHEET_NAME),
   requiredKeywords: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
   productId: z.string().trim().optional(),

@@ -318,12 +318,12 @@ function SheetTab({ requiredKeywords, productId }: TabProps) {
     <>
       <div className="card">
         <div className="field">
-          <label htmlFor="sheet-id">Google Sheet ID</label>
+          <label htmlFor="sheet-id">Google Sheet URL or ID</label>
           <input
             id="sheet-id"
             value={spreadsheetId}
             onChange={(event) => setSpreadsheetId(event.target.value)}
-            placeholder="docs.google.com/spreadsheets/d/<THIS-PART>/edit"
+            placeholder="Paste the sheet URL, or just the ID"
           />
         </div>
 

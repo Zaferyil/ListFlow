@@ -31,6 +31,15 @@ function sheetsClient() {
   return google.sheets({ version: "v4", auth: auth() });
 }
 
+/**
+ * Accepts either a bare spreadsheet ID or the full URL from the browser's
+ * address bar, because pasting the URL is what anyone actually does.
+ */
+export function extractSpreadsheetId(input: string): string {
+  const trimmed = input.trim();
+  return trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)?.[1] ?? trimmed;
+}
+
 /** 0-based column index to an A1 letter: 0 → A, 25 → Z, 26 → AA. */
 export function columnLetter(index: number): string {
   let letter = "";
