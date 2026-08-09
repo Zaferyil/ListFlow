@@ -158,6 +158,27 @@ export function missingRequiredKeywords(
 }
 
 /**
+ * A required term needs to be in the tags to be searchable, but only so many
+ * times. Two variants cover the brand search; a third is a slot spent competing
+ * with your own listing instead of reaching a different query.
+ */
+export const MAX_TAGS_PER_REQUIRED_KEYWORD = 2;
+
+/** Required terms that are eating more tag slots than they earn. */
+export function overusedKeywords(
+  listing: Listing,
+  required: string[],
+): { keyword: string; count: number }[] {
+  return required
+    .map((raw) => {
+      const keyword = raw.trim().toLowerCase();
+      const count = listing.tags.filter((tag) => tag.toLowerCase().includes(keyword)).length;
+      return { keyword: raw.trim(), count };
+    })
+    .filter((entry) => entry.count > MAX_TAGS_PER_REQUIRED_KEYWORD);
+}
+
+/**
  * Terms that describe a digital product. The shop sells printed shirts, so a
  * buyer searching these wants a file and will bounce — they are wrong traffic,
  * not just wrong wording. Matched on word boundaries so "pngs" is caught but a
@@ -204,6 +225,13 @@ export function inspectListing(listing: Listing, requiredKeywords: string[] = []
       message: `"${missing.keyword}" is missing from the ${missing.fields.join(
         " and ",
       )}. Etsy matches those fields separately.`,
+    });
+  }
+
+  for (const overused of overusedKeywords(listing, requiredKeywords)) {
+    warnings.push({
+      field: "tags",
+      message: `${overused.count} tags contain "${overused.keyword}". Two cover that search — the rest are slots not reaching a new query.`,
     });
   }
 

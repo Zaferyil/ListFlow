@@ -19,6 +19,8 @@ Bunu sadece prompt'a bırakmıyoruz. Etsy'nin indeksini okuyamayız ama modelin 
 
 Bir terim eksik çıkarsa uygulama eksiği açıkça belirten tek bir düzeltme turu atar. Terimi string olarak yamamak yerine yeniden ürettiriyoruz; yamamak anahtar kelime yığınına benzeyen bir başlık üretir. İkinci tur da tutmazsa sonuç yine dönüyor, eksik UI'da işaretleniyor.
 
+**Etiket slotu israfı.** Zorunlu bir terim en fazla **2 etikette** geçebilir. İki varyasyon o marka aramasını zaten karşılıyor; üçüncüsü yeni bir aramaya ulaşmak yerine kendi listing'inizle yarışan bir slot demek. Aşılırsa UI uyarıyor.
+
 ## Ürünler
 
 Üstteki butonlardan hangi blank'e bastığınızı seçiyorsunuz. Seçim üç sekmede de geçerli.
@@ -100,6 +102,8 @@ src/lib/sheets.ts     Google Sheets okuma/yazma
 src/lib/openai.ts    API istemcisi
 src/app/api/*         Route handler'lar
 src/app/page.tsx      UI (3 sekme)
+src/app/DropZone.tsx  Sürükle-bırak dosya alanı
+src/app/ListingCard.tsx  Sonuç kartı
 ```
 
 ## Model

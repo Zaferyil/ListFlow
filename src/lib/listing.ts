@@ -1,6 +1,12 @@
 import type OpenAI from "openai";
 import { getClient, MODEL } from "./openai";
-import { ETSY_LIMITS, type Listing, missingRequiredKeywords, normalizeListing } from "./etsy";
+import {
+  ETSY_LIMITS,
+  type Listing,
+  MAX_TAGS_PER_REQUIRED_KEYWORD,
+  missingRequiredKeywords,
+  normalizeListing,
+} from "./etsy";
 import { DEFAULT_PRODUCT_ID, findProduct, productFacts, type Product } from "./products";
 
 type UserContent = OpenAI.Chat.Completions.ChatCompletionContentPart;
@@ -94,6 +100,7 @@ function systemPrompt(product: Product, requiredKeywords: string[]): string {
       "- Etsy matches title, description and tags separately, so a term present in only one of them is invisible in the other two.",
       "- Keep the term readable in context — work it into a natural phrase (e.g. a tag like 'comfort colors tee'), do not bolt it on as a bare label.",
       "- These terms are additional to, not a replacement for, the search phrase that opens the title.",
+      `- AT MOST ${MAX_TAGS_PER_REQUIRED_KEYWORD} tags may contain any one of these terms. Two variants already cover that search; a third is a tag slot competing with your own listing instead of reaching a different query. Spend the remaining tags on the design, the occasion, the recipient, and the style.`,
     );
   }
 
