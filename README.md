@@ -2,7 +2,7 @@
 
 Etsy listing otomasyonu. İki giriş yolu var:
 
-1. **Tasarım yükle** — Claude görseli analiz eder (konu, stil, renk paleti, tipografi) ve buradan başlık/açıklama/etiket üretir.
+1. **Tasarım yükle** — Model görseli analiz eder (konu, stil, renk paleti, tipografi) ve buradan başlık/açıklama/etiket üretir.
 2. **Google Sheet** — A sütunundaki niş başlıklarını çeker, toplu üretir, isterseniz sonuçları aynı satırlara geri yazar.
 
 Üçüncü bir sekme (Tek niş) sheet'e gerek kalmadan elle niş girmek için.
@@ -25,7 +25,7 @@ Comfort Colors için modele markanın ne olduğu (ağır gramajlı, garment-dyed
 
 ```bash
 npm install
-cp .env.example .env.local   # ANTHROPIC_API_KEY'i doldurun
+cp .env.example .env.local   # OPENAI_API_KEY'i doldurun
 npm run dev
 ```
 
@@ -65,14 +65,24 @@ Toplu üretim aynı anda 3 istek çalıştırır (rate limit için). Bir satır 
 
 ```
 src/lib/etsy.ts       Etsy limitleri, normalizasyon, zorunlu kelime + açılış ifadesi kontrolü
-src/lib/listing.ts    Claude prompt'ları + structured output şeması
+src/lib/listing.ts    Prompt + structured output şeması
 src/lib/sheets.ts     Google Sheets okuma/yazma
-src/lib/anthropic.ts  API istemcisi
+src/lib/openai.ts    API istemcisi
 src/app/api/*         Route handler'lar
 src/app/page.tsx      UI (3 sekme)
 ```
 
-Model varsayılanı `claude-opus-5`; `LISTFLOW_MODEL` ile değiştirilebilir.
+## Model
+
+OpenAI Chat Completions + strict JSON schema kullanılıyor; şema sabit olduğu için çıktı her zaman aynı alanlarla geliyor.
+
+Varsayılan `gpt-5.4`. `OPENAI_MODEL` ile değiştirebilirsiniz — vision ve strict JSON schema destekleyen herhangi bir model çalışır. Aynı prompt ile ölçtüğüm süreler:
+
+| Model | Süre | Not |
+|---|---|---|
+| `gpt-5.4` | ~6-8 sn | Varsayılan; temiz çıktı |
+| `gpt-5.4-mini` | ~3 sn | Toplu iş için; başlıkta hafif tekrar eğilimi |
+| `gpt-5.5` | ~26 sn | Bu görevde ek kazanç görmedim |
 
 ## Notlar
 

@@ -1,6 +1,8 @@
-import type Anthropic from "@anthropic-ai/sdk";
-import { getClient, MODEL } from "./anthropic";
+import type OpenAI from "openai";
+import { getClient, MODEL } from "./openai";
 import { ETSY_LIMITS, type Listing, missingRequiredKeywords, normalizeListing } from "./etsy";
+
+type UserContent = OpenAI.Chat.Completions.ChatCompletionContentPart;
 
 export type Language = "tr" | "en";
 
@@ -111,32 +113,37 @@ function systemPrompt(language: Language, requiredKeywords: string[]): string {
 
 /** One structured-output call. */
 async function callModel(
-  content: Anthropic.ContentBlockParam[],
+  content: UserContent[],
   language: Language,
   requiredKeywords: string[],
 ): Promise<Listing> {
-  const response = await getClient().messages.create({
+  const response = await getClient().chat.completions.create({
     model: MODEL,
-    max_tokens: 8000,
-    thinking: { type: "adaptive" },
-    output_config: {
-      effort: "medium",
-      format: { type: "json_schema", schema: LISTING_SCHEMA },
+    max_completion_tokens: 4000,
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: "etsy_listing", strict: true, schema: LISTING_SCHEMA },
     },
-    system: systemPrompt(language, requiredKeywords),
-    messages: [{ role: "user", content }],
+    messages: [
+      { role: "system", content: systemPrompt(language, requiredKeywords) },
+      { role: "user", content },
+    ],
   });
 
-  if (response.stop_reason === "refusal") {
-    throw new Error("Model bu istegi reddetti. Lutfen farkli bir tasarim veya nis deneyin.");
-  }
+  const message = response.choices[0]?.message;
 
-  const text = response.content.find((block) => block.type === "text");
-  if (!text || text.type !== "text") {
+  if (message?.refusal) {
+    throw new Error(`Model bu istegi reddetti: ${message.refusal}`);
+  }
+  // Strict schema output is only complete if generation wasn't cut short.
+  if (response.choices[0]?.finish_reason === "length") {
+    throw new Error("Yanit token limitine takildi. Daha kisa bir baglam ile tekrar deneyin.");
+  }
+  if (!message?.content) {
     throw new Error("Model bos yanit dondu. Tekrar deneyin.");
   }
 
-  return normalizeListing(JSON.parse(text.text) as Listing);
+  return normalizeListing(JSON.parse(message.content) as Listing);
 }
 
 /**
@@ -146,7 +153,7 @@ async function callModel(
  * string surgery would produce a title that reads like a keyword dump.
  */
 async function requestListing(
-  content: Anthropic.ContentBlockParam[],
+  content: UserContent[],
   options: GenerateOptions,
 ): Promise<Listing> {
   const language = options.language ?? "en";
@@ -218,7 +225,10 @@ export function generateFromDesign(
 
   return requestListing(
     [
-      { type: "image", source: { type: "base64", media_type: design.mediaType, data: design.data } },
+      {
+        type: "image_url",
+        image_url: { url: `data:${design.mediaType};base64,${design.data}` },
+      },
       { type: "text", text: prompt },
     ],
     options,
