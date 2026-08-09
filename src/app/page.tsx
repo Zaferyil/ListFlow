@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Listing, ListingWarning } from "@/lib/etsy";
 import { DEFAULT_PRODUCT_ID, findProduct, PRODUCTS } from "@/lib/products";
 import { DropZone } from "./DropZone";
@@ -32,7 +32,36 @@ async function errorFrom(response: Response): Promise<string> {
   return `Request failed (${response.status}).`;
 }
 
-function Settings({
+/** A numbered stage of the flow: circle, heading, then its own content. */
+function Step({
+  number,
+  title,
+  description,
+  children,
+}: {
+  number: number;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="step">
+      <div className="step-number" aria-hidden="true">
+        {number}
+      </div>
+      <div className="step-heading">
+        <h2>
+          <span className="visually-hidden">{`Step ${number}: `}</span>
+          {title}
+        </h2>
+        <p>{description}</p>
+      </div>
+      <div className="step-body">{children}</div>
+    </section>
+  );
+}
+
+function BlankPicker({
   productId,
   onProductChange,
 }: {
@@ -43,32 +72,29 @@ function Settings({
 
   return (
     <div className="card">
-      <div className="field" style={{ marginBottom: 0 }}>
-        <label>Blank</label>
-        <div className="choices">
-          {PRODUCTS.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              className="choice"
-              aria-pressed={entry.id === productId}
-              onClick={() => onProductChange(entry.id)}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </div>
-        <p className="hint">
-          {product.composition} · {product.weight} · {product.fit}
-          {product.colorCaveat ? ` — ${product.colorCaveat}` : ""}
-        </p>
-        {product.requiredKeywords.length > 0 && (
-          <p className="hint">
-            &quot;{product.requiredKeywords.join('", "')}&quot; is required in the title, description
-            and tags for this blank.
-          </p>
-        )}
+      <div className="choices">
+        {PRODUCTS.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            className="choice"
+            aria-pressed={entry.id === productId}
+            onClick={() => onProductChange(entry.id)}
+          >
+            {entry.label}
+          </button>
+        ))}
       </div>
+      <p className="hint">
+        {product.composition} · {product.weight} · {product.fit}
+        {product.colorCaveat ? ` — ${product.colorCaveat}` : ""}
+      </p>
+      {product.requiredKeywords.length > 0 && (
+        <p className="hint">
+          &quot;{product.requiredKeywords.join('", "')}&quot; is required in the title, description
+          and tags for this blank.
+        </p>
+      )}
     </div>
   );
 }
@@ -106,16 +132,26 @@ function DesignTab({ productId }: TabProps) {
 
   return (
     <>
-      <div className="card">
-        <DropZone file={file} onFileChange={setFile} />
+      <Step number={2} title="Design" description="Drop the artwork that goes on the garment.">
+        <div className="card">
+          <DropZone file={file} onFileChange={setFile} />
+        </div>
+      </Step>
 
-        <button className="primary" onClick={submit} disabled={!file || loading}>
-          {loading ? "Analyzing…" : "Generate listing"}
-        </button>
-      </div>
+      <Step number={3} title="Generate" description="Title, description and 13 tags, ready to paste.">
+        <div className="card">
+          <button className="primary" onClick={submit} disabled={!file || loading}>
+            {loading ? "Analyzing…" : "Generate listing"}
+          </button>
+        </div>
 
-      {error && <div className="alert error">{error}</div>}
-      {result && <ListingCard listing={result.listing} warnings={result.warnings} />}
+        {error && <div className="alert error" style={{ marginTop: "1rem" }}>{error}</div>}
+        {result && (
+          <div style={{ marginTop: "1rem" }}>
+            <ListingCard listing={result.listing} warnings={result.warnings} />
+          </div>
+        )}
+      </Step>
     </>
   );
 }
@@ -147,24 +183,34 @@ function NicheTab({ productId }: TabProps) {
 
   return (
     <>
-      <div className="card">
-        <div className="field">
-          <label htmlFor="niche">Niche / shirt idea</label>
-          <input
-            id="niche"
-            value={niche}
-            onChange={(event) => setNiche(event.target.value)}
-            placeholder="e.g. retro sunset graphic tee for summer"
-          />
+      <Step number={2} title="Niche" description="Describe the shirt idea in a few words.">
+        <div className="card">
+          <div className="field">
+            <label htmlFor="niche">Niche / shirt idea</label>
+            <input
+              id="niche"
+              value={niche}
+              onChange={(event) => setNiche(event.target.value)}
+              placeholder="e.g. retro sunset graphic tee for summer"
+            />
+          </div>
+        </div>
+      </Step>
+
+      <Step number={3} title="Generate" description="Title, description and 13 tags, ready to paste.">
+        <div className="card">
+          <button className="primary" onClick={submit} disabled={niche.trim().length < 2 || loading}>
+            {loading ? "Generating…" : "Generate listing"}
+          </button>
         </div>
 
-        <button className="primary" onClick={submit} disabled={niche.trim().length < 2 || loading}>
-          {loading ? "Generating…" : "Generate listing"}
-        </button>
-      </div>
-
-      {error && <div className="alert error">{error}</div>}
-      {result && <ListingCard listing={result.listing} warnings={result.warnings} />}
+        {error && <div className="alert error" style={{ marginTop: "1rem" }}>{error}</div>}
+        {result && (
+          <div style={{ marginTop: "1rem" }}>
+            <ListingCard listing={result.listing} warnings={result.warnings} />
+          </div>
+        )}
+      </Step>
     </>
   );
 }
@@ -179,10 +225,20 @@ interface LayoutInfo {
   tags: string;
 }
 
-function LayoutSummary({ layout, pending, skipped }: { layout: LayoutInfo; pending: number; skipped?: number }) {
+function LayoutSummary({
+  layout,
+  pending,
+  skipped,
+}: {
+  layout: LayoutInfo;
+  pending: number;
+  skipped?: number;
+}) {
   return (
     <div className="alert info">
-      <strong>{pending} row{pending === 1 ? "" : "s"} marked New</strong>
+      <strong>
+        {pending} row{pending === 1 ? "" : "s"} marked New
+      </strong>
       {typeof skipped === "number" && skipped > 0 ? ` · ${skipped} already done` : ""}
       <br />
       Reading niche from <code>{layout.niche}</code>
@@ -193,8 +249,8 @@ function LayoutSummary({ layout, pending, skipped }: { layout: LayoutInfo; pendi
       ) : (
         <> · no status column found, so every row counts as New</>
       )}
-      . Writing title to <code>{layout.title}</code>, description to <code>{layout.description}</code>,
-      tags to <code>{layout.tags}</code>.
+      . Writing title to <code>{layout.title}</code>, description to{" "}
+      <code>{layout.description}</code>, tags to <code>{layout.tags}</code>.
       {!layout.fromHeaders && " No header row recognised — columns assumed left to right."}
     </div>
   );
@@ -241,13 +297,7 @@ function SheetTab({ productId }: TabProps) {
       const response = await fetch("/api/sheets", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          spreadsheetId,
-          sheetName,
-          limit,
-          writeBack,
-          productId,
-        }),
+        body: JSON.stringify({ spreadsheetId, sheetName, limit, writeBack, productId }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       const body = await response.json();
@@ -275,119 +325,165 @@ function SheetTab({ productId }: TabProps) {
 
   return (
     <>
-      <div className="card">
-        <div className="field">
-          <label htmlFor="sheet-id">Google Sheet URL or ID</label>
-          <input
-            id="sheet-id"
-            value={spreadsheetId}
-            onChange={(event) => setSpreadsheetId(event.target.value)}
-            placeholder="Paste the sheet URL, or just the ID"
-          />
-        </div>
-
-        <div className="row">
+      <Step number={2} title="Sheet" description="Point ListFlow at the tab holding your niches.">
+        <div className="card">
           <div className="field">
-            <label htmlFor="sheet-name">Tab name</label>
+            <label htmlFor="sheet-id">Google Sheet URL or ID</label>
             <input
-              id="sheet-name"
-              value={sheetName}
-              onChange={(event) => setSheetName(event.target.value)}
+              id="sheet-id"
+              value={spreadsheetId}
+              onChange={(event) => setSpreadsheetId(event.target.value)}
+              placeholder="Paste the sheet URL, or just the ID"
             />
           </div>
-          <div className="field">
-            <label htmlFor="sheet-limit">Max rows per run</label>
+
+          <div className="row">
+            <div className="field">
+              <label htmlFor="sheet-name">Tab name</label>
+              <input
+                id="sheet-name"
+                value={sheetName}
+                onChange={(event) => setSheetName(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="sheet-limit">Max rows per run</label>
+              <input
+                id="sheet-limit"
+                type="number"
+                min={1}
+                max={50}
+                value={limit}
+                onChange={(event) => setLimit(Number(event.target.value))}
+              />
+            </div>
+          </div>
+
+          <label className="checkbox">
             <input
-              id="sheet-limit"
-              type="number"
-              min={1}
-              max={50}
-              value={limit}
-              onChange={(event) => setLimit(Number(event.target.value))}
+              type="checkbox"
+              checked={writeBack}
+              onChange={(event) => setWriteBack(event.target.checked)}
             />
+            Write results back and set Status to Done
+          </label>
+
+          <p className="hint">
+            Only rows whose Status is <code>New</code> (or blank) are processed. Share the sheet with
+            your service account as an <strong>Editor</strong> — Viewer cannot write back.
+          </p>
+        </div>
+      </Step>
+
+      <Step
+        number={3}
+        title="Generate"
+        description="Check the column mapping first, then run the batch."
+      >
+        <div className="card">
+          <div className="actions">
+            <button className="ghost" onClick={preview} disabled={!spreadsheetId || loading}>
+              Check sheet
+            </button>
+            <button className="primary" onClick={generate} disabled={!spreadsheetId || loading}>
+              {loading ? "Working…" : "Generate New rows"}
+            </button>
           </div>
         </div>
 
-        <label className="checkbox" style={{ marginBottom: "1rem" }}>
-          <input
-            type="checkbox"
-            checked={writeBack}
-            onChange={(event) => setWriteBack(event.target.checked)}
-          />
-          Write results back and set Status to Done
-        </label>
+        <div style={{ marginTop: "1rem" }}>
+          {error && <div className="alert error">{error}</div>}
+          {writeInfo && <div className="alert warn">{writeInfo}</div>}
+          {layout && pendingCount !== null && (
+            <LayoutSummary layout={layout} pending={pendingCount} skipped={skipped} />
+          )}
 
-        <div style={{ display: "flex", gap: "0.6rem" }}>
-          <button className="ghost" onClick={preview} disabled={!spreadsheetId || loading}>
-            Check sheet
-          </button>
-          <button className="primary" onClick={generate} disabled={!spreadsheetId || loading}>
-            {loading ? "Working…" : "Generate New rows"}
-          </button>
+          {rows.map((entry) =>
+            entry.listing ? (
+              <ListingCard
+                key={entry.row}
+                listing={entry.listing}
+                warnings={entry.warnings}
+                heading={`Row ${entry.row} — ${entry.niche}`}
+              />
+            ) : (
+              <div key={entry.row} className="alert error">
+                {`Row ${entry.row} — ${entry.niche}: ${entry.error}`}
+              </div>
+            ),
+          )}
         </div>
-
-        <p className="hint" style={{ marginBottom: 0 }}>
-          Only rows whose Status is <code>New</code> (or blank) are processed; they are set to{" "}
-          <code>Done</code> afterwards. Columns are matched by header name. Share the sheet with your
-          service account as an <strong>Editor</strong> — Viewer is not enough to write back.
-        </p>
-      </div>
-
-      {error && <div className="alert error">{error}</div>}
-      {writeInfo && <div className="alert warn">{writeInfo}</div>}
-      {layout && pendingCount !== null && (
-        <LayoutSummary layout={layout} pending={pendingCount} skipped={skipped} />
-      )}
-
-      {rows.map((entry) =>
-        entry.listing ? (
-          <ListingCard
-            key={entry.row}
-            listing={entry.listing}
-            warnings={entry.warnings}
-            heading={`Row ${entry.row} — ${entry.niche}`}
-          />
-        ) : (
-          <div key={entry.row} className="alert error">
-            {`Row ${entry.row} — ${entry.niche}: ${entry.error}`}
-          </div>
-        ),
-      )}
+      </Step>
     </>
   );
 }
+
+// A short label as well, so all three tabs fit a phone without the last one
+// being clipped mid-word.
+const TABS: { id: Tab; label: string; short: string }[] = [
+  { id: "design", label: "Design analysis", short: "Design" },
+  { id: "niche", label: "Single niche", short: "Niche" },
+  { id: "sheet", label: "Google Sheet", short: "Sheet" },
+];
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("design");
   const [productId, setProductId] = useState(DEFAULT_PRODUCT_ID);
 
   return (
-    <main className="page">
-      <header>
-        <h1>ListFlow</h1>
-        <p>
-          Upload a design or pull niches from a Google Sheet — ListFlow writes the Etsy title,
-          description and 13 tags for your printed shirts.
-        </p>
+    <>
+      <header className="app-header">
+        <div className="app-header-inner">
+          <span className="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path
+                d="M8.5 3 5 4.8 3 8.5l3 1.8V21h12v-10.7l3-1.8-2-3.7L15.5 3a3.5 3.5 0 0 1-7 0Z"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          <span className="brand-text">
+            <strong>ListFlow</strong>
+            <span>Etsy listings for print-on-demand shirts</span>
+          </span>
+        </div>
       </header>
 
-      <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === "design"} onClick={() => setTab("design")}>
-          Design analysis
-        </button>
-        <button role="tab" aria-selected={tab === "niche"} onClick={() => setTab("niche")}>
-          Single niche
-        </button>
-        <button role="tab" aria-selected={tab === "sheet"} onClick={() => setTab("sheet")}>
-          Google Sheet
-        </button>
-      </div>
+      <main className="page">
+        <div className="hero">
+          <h1>Etsy listings in seconds ✨</h1>
+          <p>
+            Pick a blank, add a design or a niche, and ListFlow writes the title, description and 13
+            tags.
+          </p>
+        </div>
 
-      <Settings productId={productId} onProductChange={setProductId} />
+        <div className="tabs" role="tablist" aria-label="Input mode">
+          {TABS.map((entry) => (
+            <button
+              key={entry.id}
+              role="tab"
+              aria-selected={tab === entry.id}
+              onClick={() => setTab(entry.id)}
+            >
+              <span className="tab-full">{entry.label}</span>
+              <span className="tab-short">{entry.short}</span>
+            </button>
+          ))}
+        </div>
 
-      {tab === "design" && <DesignTab productId={productId} />}
-      {tab === "niche" && <NicheTab productId={productId} />}
-      {tab === "sheet" && <SheetTab productId={productId} />}
-    </main>
+        <Step
+          number={1}
+          title="Blank"
+          description="Its real fabric specs go into every listing you generate."
+        >
+          <BlankPicker productId={productId} onProductChange={setProductId} />
+        </Step>
+
+        {tab === "design" && <DesignTab productId={productId} />}
+        {tab === "niche" && <NicheTab productId={productId} />}
+        {tab === "sheet" && <SheetTab productId={productId} />}
+      </main>
+    </>
   );
 }

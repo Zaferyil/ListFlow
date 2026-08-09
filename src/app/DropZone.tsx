@@ -80,8 +80,6 @@ export function DropZone({
 
   return (
     <div className="field">
-      <label htmlFor="design">Design file</label>
-
       <div
         className={`dropzone${dragging ? " dragging" : ""}`}
         role="button"
