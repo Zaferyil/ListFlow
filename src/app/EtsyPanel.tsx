@@ -286,6 +286,14 @@ export function EtsyPanel({
   const sizeCount = parseSizes(settings.sizesText).length;
   const colorCount = parseColors(settings.colorsText).length;
   const offeringCount = sizeCount * Math.max(colorCount, 1);
+  // A missing decimal point turns 49.99 into 4999 and reaches Etsy silently.
+  // Anything far above the rest of the run is almost certainly that typo.
+  const outliers = (() => {
+    const sizes = parseSizes(settings.sizesText);
+    if (sizes.length < 2) return [];
+    const cheapest = Math.min(...sizes.map((size) => size.price));
+    return sizes.filter((size) => size.price > cheapest * 5);
+  })();
   const ready =
     listing !== null &&
     settings.taxonomyId !== null &&
@@ -443,7 +451,7 @@ export function EtsyPanel({
 
           <div className="row">
             <div className="field">
-              <label htmlFor="etsy-sizes">{settings.sizeLabel || "Size"} and prices</label>
+              <label htmlFor="etsy-sizes">Values and prices</label>
               <textarea
                 id="etsy-sizes"
                 rows={7}
@@ -463,6 +471,13 @@ export function EtsyPanel({
               />
             </div>
           </div>
+          {outliers.length > 0 && (
+            <div className="alert warn">
+              {outliers.map((size) => `${size.name} = ${size.price}`).join(", ")} —{" "}
+              {outliers.length === 1 ? "this price is" : "these prices are"} far above the rest of
+              the run. Check for a missing decimal point before sending.
+            </div>
+          )}
           <p className="hint">
             One per line, as <code>name = price</code>. The name is what the buyer picks, so it
             can carry the garment too — <code>Short Sleeve / 2XL</code>. Etsy lets price vary on one
