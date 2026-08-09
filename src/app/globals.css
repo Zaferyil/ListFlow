@@ -707,9 +707,21 @@ button.linklike {
   list-style: none;
   margin: 0.75rem 0 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  display: grid;
+  gap: 0.5rem 0.75rem;
+  /* Fill a column top to bottom, then start the next one beside it. The row
+     count is set inline from the number of photos, so a short list does not
+     leave empty rows behind. */
+  grid-template-rows: repeat(var(--rows, 1), auto);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 720px) {
+  .templates {
+    grid-auto-flow: row;
+    grid-template-rows: none;
+  }
 }
 
 .templates li {
@@ -745,7 +757,11 @@ button.linklike {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text);
-  overflow-wrap: anywhere;
+  /* One line per row keeps the columns aligned; the full name is in the
+     tooltip. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dropzone.disabled {
@@ -770,14 +786,15 @@ button.linklike {
   letter-spacing: -0.1em;
 }
 
-.template-actions {
+/* Scoped past `.templates span`, which lays the label out as a column. */
+.templates .template-actions {
   flex: none;
   flex-direction: row;
   align-items: center;
   gap: 0.4rem;
 }
 
-.template-actions button.ghost {
+.templates .template-actions button.ghost {
   padding: 0.2rem 0.5rem;
   line-height: 1.2;
 }

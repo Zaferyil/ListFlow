@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { Listing } from "@/lib/etsy";
 import { FileDrop } from "./FileDrop";
 
@@ -595,7 +595,12 @@ export function EtsyPanel({
           onFiles={(files) => void addTemplates(files)}
         />
         {templates.length > 0 && (
-          <ul className="templates">
+          // Five to a column, then a new column beside it — ten photos stacked
+          // vertically pushed the send button off the screen.
+          <ul
+            className="templates"
+            style={{ "--rows": Math.min(templates.length, 5) } as CSSProperties}
+          >
             {templates.map((image, index) => (
               <li
                 key={image.name}
@@ -649,7 +654,7 @@ export function EtsyPanel({
                   alt=""
                 />
                 <span>
-                  <strong>
+                  <strong title={image.name}>
                     {index + 1}. {image.name}
                   </strong>
                   {formatSize(image.size)}
