@@ -27,7 +27,7 @@ async function errorFrom(response: Response): Promise<string> {
   } catch {
     // Non-JSON error body (e.g. a proxy timeout page) — fall through.
   }
-  return `Istek basarisiz (${response.status}).`;
+  return `Request failed (${response.status}).`;
 }
 
 const COMFORT_COLORS = "Comfort Colors";
@@ -51,21 +51,20 @@ function Settings({
           checked={comfortColors}
           onChange={(event) => onComfortColorsChange(event.target.checked)}
         />
-        Comfort Colors urunu — &quot;{COMFORT_COLORS}&quot; baslikta, aciklamada ve etiketlerde
-        gecsin
+        Comfort Colors shirt — require &quot;{COMFORT_COLORS}&quot; in the title, description and tags
       </label>
 
       <div className="field" style={{ marginBottom: 0 }}>
-        <label htmlFor="required-keywords">Diger zorunlu kelimeler (virgulle ayirin)</label>
+        <label htmlFor="required-keywords">Other required keywords (comma separated)</label>
         <input
           id="required-keywords"
           value={extraKeywords}
           onChange={(event) => onExtraKeywordsChange(event.target.value)}
-          placeholder="Orn: Gildan 18000, oversized"
+          placeholder="e.g. Gildan 18000, oversized"
         />
         <p style={{ fontSize: "0.78rem", color: "var(--muted)", margin: "0.4rem 0 0" }}>
-          Her terim uc alanda da gecer. Basligin ilk 3-4 kelimesi yine musterinin arama ifadesi
-          olur — zorunlu kelimeler onun yerini almaz.
+          Each term is placed in all three fields. The first 3-4 words of the title stay the
+          buyer&apos;s search phrase — required keywords do not replace it.
         </p>
       </div>
     </div>
@@ -111,7 +110,7 @@ function DesignTab({ requiredKeywords }: TabProps) {
       if (!response.ok) throw new Error(await errorFrom(response));
       setResult(await response.json());
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Bilinmeyen hata.");
+      setError(caught instanceof Error ? caught.message : "Unknown error.");
     } finally {
       setLoading(false);
     }
@@ -121,7 +120,7 @@ function DesignTab({ requiredKeywords }: TabProps) {
     <>
       <div className="card">
         <div className="field">
-          <label htmlFor="design">Tasarim dosyasi (PNG, JPEG, WebP, GIF, SVG — max 8 MB)</label>
+          <label htmlFor="design">Design file (PNG, JPEG, WebP, GIF, SVG — max 8 MB)</label>
           <input
             id="design"
             type="file"
@@ -133,21 +132,21 @@ function DesignTab({ requiredKeywords }: TabProps) {
         {previewUrl && (
           // Local blob preview — next/image would need a configured loader for blob: URLs.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt="Yuklenen tasarimin onizlemesi" className="preview" />
+          <img src={previewUrl} alt="Preview of the uploaded design" className="preview" />
         )}
 
         <div className="field" style={{ marginTop: "1rem" }}>
-          <label htmlFor="design-context">Ek baglam (opsiyonel)</label>
+          <label htmlFor="design-context">Extra context (optional)</label>
           <textarea
             id="design-context"
             value={context}
             onChange={(event) => setContext(event.target.value)}
-            placeholder="Orn: dijital indirilebilir poster, 24x36 inch, minimalist ev dekoru magazasi"
+            placeholder="e.g. oversized boxy fit, sand and black colorways, gift for new moms"
           />
         </div>
 
         <button className="primary" onClick={submit} disabled={!file || loading}>
-          {loading ? "Analiz ediliyor…" : "Listing uret"}
+          {loading ? "Analyzing…" : "Generate listing"}
         </button>
       </div>
 
@@ -177,7 +176,7 @@ function NicheTab({ requiredKeywords }: TabProps) {
       if (!response.ok) throw new Error(await errorFrom(response));
       setResult(await response.json());
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Bilinmeyen hata.");
+      setError(caught instanceof Error ? caught.message : "Unknown error.");
     } finally {
       setLoading(false);
     }
@@ -187,27 +186,27 @@ function NicheTab({ requiredKeywords }: TabProps) {
     <>
       <div className="card">
         <div className="field">
-          <label htmlFor="niche">Nis / urun fikri</label>
+          <label htmlFor="niche">Niche / shirt idea</label>
           <input
             id="niche"
             value={niche}
             onChange={(event) => setNiche(event.target.value)}
-            placeholder="Orn: boho pampas grass wall art printable"
+            placeholder="e.g. retro sunset graphic tee for summer"
           />
         </div>
 
         <div className="field">
-          <label htmlFor="niche-context">Ek baglam (opsiyonel)</label>
+          <label htmlFor="niche-context">Extra context (optional)</label>
           <textarea
             id="niche-context"
             value={context}
             onChange={(event) => setContext(event.target.value)}
-            placeholder="Hedef kitle, magaza tarzi, urun formati…"
+            placeholder="Target buyer, shop style, fit…"
           />
         </div>
 
         <button className="primary" onClick={submit} disabled={niche.trim().length < 2 || loading}>
-          {loading ? "Uretiliyor…" : "Listing uret"}
+          {loading ? "Generating…" : "Generate listing"}
         </button>
       </div>
 
@@ -243,7 +242,7 @@ function SheetTab({ requiredKeywords }: TabProps) {
         })),
       );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Bilinmeyen hata.");
+      setError(caught instanceof Error ? caught.message : "Unknown error.");
     } finally {
       setLoading(false);
     }
@@ -263,12 +262,12 @@ function SheetTab({ requiredKeywords }: TabProps) {
       const body = await response.json();
       setRows(body.results as BatchRow[]);
       if (body.writeError) {
-        setWriteInfo(`Sheet'e yazilamadi: ${body.writeError}`);
+        setWriteInfo(`Could not write to the sheet: ${body.writeError}`);
       } else if (writeBack) {
-        setWriteInfo(`${body.writtenRows} satir sheet'e yazildi (C:E sutunlari).`);
+        setWriteInfo(`Wrote ${body.writtenRows} rows to the sheet (columns C:E).`);
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Bilinmeyen hata.");
+      setError(caught instanceof Error ? caught.message : "Unknown error.");
     } finally {
       setLoading(false);
     }
@@ -283,13 +282,13 @@ function SheetTab({ requiredKeywords }: TabProps) {
             id="sheet-id"
             value={spreadsheetId}
             onChange={(event) => setSpreadsheetId(event.target.value)}
-            placeholder="docs.google.com/spreadsheets/d/<BU-KISIM>/edit"
+            placeholder="docs.google.com/spreadsheets/d/<THIS-PART>/edit"
           />
         </div>
 
         <div className="row">
           <div className="field">
-            <label htmlFor="sheet-range">Aralik</label>
+            <label htmlFor="sheet-range">Range</label>
             <input
               id="sheet-range"
               value={range}
@@ -297,7 +296,7 @@ function SheetTab({ requiredKeywords }: TabProps) {
             />
           </div>
           <div className="field">
-            <label htmlFor="sheet-limit">Kac nis islensin</label>
+            <label htmlFor="sheet-limit">How many niches</label>
             <input
               id="sheet-limit"
               type="number"
@@ -315,21 +314,21 @@ function SheetTab({ requiredKeywords }: TabProps) {
             checked={writeBack}
             onChange={(event) => setWriteBack(event.target.checked)}
           />
-          Sonuclari sheet&apos;e geri yaz (C: baslik, D: aciklama, E: etiketler)
+          Write results back to the sheet (C: title, D: description, E: tags)
         </label>
 
         <div style={{ display: "flex", gap: "0.6rem" }}>
           <button className="ghost" onClick={preview} disabled={!spreadsheetId || loading}>
-            Nisleri onizle
+            Preview niches
           </button>
           <button className="primary" onClick={generate} disabled={!spreadsheetId || loading}>
-            {loading ? "Calisiyor…" : "Toplu uret"}
+            {loading ? "Working…" : "Generate batch"}
           </button>
         </div>
 
         <p style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: 0 }}>
-          A sutunu nis basligi, B sutunu (opsiyonel) o nise ozel baglam olarak okunur. Sheet&apos;i
-          servis hesabinizin e-postasiyla paylasmayi unutmayin.
+          Column A is the niche, column B (optional) is per-row context. Remember to share the
+          sheet with your service account email.
         </p>
       </div>
 
@@ -342,11 +341,11 @@ function SheetTab({ requiredKeywords }: TabProps) {
             key={entry.row}
             listing={entry.listing}
             warnings={entry.warnings}
-            heading={`Satir ${entry.row} — ${entry.niche}`}
+            heading={`Row ${entry.row} — ${entry.niche}`}
           />
         ) : (
           <div key={entry.row} className={entry.error ? "alert error" : "card"}>
-            {entry.error ? `Satir ${entry.row} — ${entry.niche}: ${entry.error}` : `Satir ${entry.row} — ${entry.niche}`}
+            {entry.error ? `Row ${entry.row} — ${entry.niche}: ${entry.error}` : `Row ${entry.row} — ${entry.niche}`}
           </div>
         ),
       )}
@@ -372,17 +371,17 @@ export default function Home() {
       <header>
         <h1>ListFlow</h1>
         <p>
-          Tasarim yukleyin veya Google Sheet&apos;ten nis cekin; ListFlow Etsy icin baslik, aciklama
-          ve 13 etiketi uretsin.
+          Upload a design or pull niches from a Google Sheet — ListFlow writes the Etsy title,
+          description and 13 tags for your printed shirts.
         </p>
       </header>
 
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === "design"} onClick={() => setTab("design")}>
-          Tasarim analizi
+          Design analysis
         </button>
         <button role="tab" aria-selected={tab === "niche"} onClick={() => setTab("niche")}>
-          Tek nis
+          Single niche
         </button>
         <button role="tab" aria-selected={tab === "sheet"} onClick={() => setTab("sheet")}>
           Google Sheet

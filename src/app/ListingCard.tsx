@@ -16,11 +16,15 @@ function CopyButton({ value }: { value: string }) {
         setTimeout(() => setCopied(false), 1500);
       }}
     >
-      {copied ? "Kopyalandi" : "Kopyala"}
+      {copied ? "Copied" : "Copy"}
     </button>
   );
 }
 
+/**
+ * Fields are ordered title → description → tags to match the order they are
+ * filled in on Etsy's own listing form.
+ */
 export function ListingCard({
   listing,
   warnings = [],
@@ -42,7 +46,7 @@ export function ListingCard({
 
       <section>
         <div className="meta">
-          <h3>Baslik</h3>
+          <h3>Title</h3>
           <span>
             {listing.title.length}/{ETSY_LIMITS.titleMaxChars} <CopyButton value={listing.title} />
           </span>
@@ -52,7 +56,15 @@ export function ListingCard({
 
       <section>
         <div className="meta">
-          <h3>Etiketler</h3>
+          <h3>Description</h3>
+          <CopyButton value={listing.description} />
+        </div>
+        <pre>{listing.description}</pre>
+      </section>
+
+      <section>
+        <div className="meta">
+          <h3>Tags</h3>
           <span>
             {listing.tags.length}/{ETSY_LIMITS.maxTags}{" "}
             <CopyButton value={listing.tags.join(", ")} />
@@ -65,17 +77,9 @@ export function ListingCard({
         </ul>
       </section>
 
-      <section>
-        <div className="meta">
-          <h3>Aciklama</h3>
-          <CopyButton value={listing.description} />
-        </div>
-        <pre>{listing.description}</pre>
-      </section>
-
       {listing.materials.length > 0 && (
         <section>
-          <h3>Malzemeler / Formatlar</h3>
+          <h3>Materials</h3>
           <ul className="tags">
             {listing.materials.map((material) => (
               <li key={material}>{material}</li>
@@ -86,14 +90,14 @@ export function ListingCard({
 
       {listing.category && (
         <section>
-          <h3>Onerilen kategori</h3>
+          <h3>Suggested category</h3>
           <p style={{ margin: 0 }}>{listing.category}</p>
         </section>
       )}
 
       {listing.notes && (
         <section>
-          <h3>Strateji notu</h3>
+          <h3>Strategy note</h3>
           <p style={{ margin: 0, color: "var(--muted)" }}>{listing.notes}</p>
         </section>
       )}

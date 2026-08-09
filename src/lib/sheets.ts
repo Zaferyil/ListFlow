@@ -17,7 +17,7 @@ function auth(): JWT {
 
   if (!email || !key) {
     throw new Error(
-      "Google Sheets yapilandirilmamis. GOOGLE_SERVICE_ACCOUNT_EMAIL ve GOOGLE_PRIVATE_KEY tanimlayin.",
+      "Google Sheets is not configured. Set GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY.",
     );
   }
 

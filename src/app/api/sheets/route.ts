@@ -14,7 +14,7 @@ const CONCURRENCY = 3;
 export async function GET(request: Request) {
   try {
     if (!isSheetsConfigured()) {
-      return NextResponse.json({ error: "Google Sheets yapilandirilmamis." }, { status: 501 });
+      return NextResponse.json({ error: "Google Sheets is not configured." }, { status: 501 });
     }
 
     const params = new URL(request.url).searchParams;
@@ -22,12 +22,12 @@ export async function GET(request: Request) {
     const range = params.get("range") ?? process.env.GOOGLE_SHEET_RANGE ?? "Sheet1!A:B";
 
     if (!spreadsheetId) {
-      return NextResponse.json({ error: "spreadsheetId gerekli." }, { status: 400 });
+      return NextResponse.json({ error: "spreadsheetId is required." }, { status: 400 });
     }
 
     return NextResponse.json({ niches: await readNiches(spreadsheetId, range), range });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Sheet okunamadi.";
+    const message = error instanceof Error ? error.message : "Could not read the sheet.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -53,7 +53,7 @@ interface BatchResult {
 export async function POST(request: Request) {
   try {
     if (!isSheetsConfigured()) {
-      return NextResponse.json({ error: "Google Sheets yapilandirilmamis." }, { status: 501 });
+      return NextResponse.json({ error: "Google Sheets is not configured." }, { status: 501 });
     }
 
     const parsed = generateSchema.safeParse(await request.json());
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const niches = (await readNiches(spreadsheetId, range)).slice(0, limit);
 
     if (niches.length === 0) {
-      return NextResponse.json({ error: "Sheet'te islenecek nis bulunamadi." }, { status: 404 });
+      return NextResponse.json({ error: "No niches found in the sheet." }, { status: 404 });
     }
 
     const results: BatchResult[] = new Array(niches.length);
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
           results[index] = {
             row: entry.row,
             niche: entry.niche,
-            error: error instanceof Error ? error.message : "Uretim basarisiz.",
+            error: error instanceof Error ? error.message : "Generation failed.",
           };
         }
       }
@@ -124,13 +124,13 @@ export async function POST(request: Request) {
         writtenRows = successful.length;
       } catch (error) {
         // A failed write-back must not discard listings we already paid to generate.
-        writeError = error instanceof Error ? error.message : "Sheet'e yazilamadi.";
+        writeError = error instanceof Error ? error.message : "Could not write to the sheet.";
       }
     }
 
     return NextResponse.json({ results, writtenRows, writeError });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Beklenmeyen bir hata olustu.";
+    const message = error instanceof Error ? error.message : "Something went wrong.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

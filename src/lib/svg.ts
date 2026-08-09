@@ -62,14 +62,14 @@ export function rasterizeSvg(source: Buffer): RasterizedSvg {
     probe = new Resvg(source, { fitTo }).render();
   } catch (error) {
     throw new Error(
-      `SVG dosyasi okunamadi: ${error instanceof Error ? error.message : "bilinmeyen hata"}`,
+      `Could not read the SVG: ${error instanceof Error ? error.message : "unknown error"}`,
     );
   }
 
   const luminance = artworkLuminance(probe.pixels);
   if (luminance === null) {
     throw new Error(
-      "SVG bos gorunuyor. Dosyada gomulu yazi tipi veya dis kaynak varsa cizim olusturulamamis olabilir; PNG olarak disa aktarip tekrar deneyin.",
+      "The SVG rendered as empty. If it relies on an embedded font or an external reference, nothing was drawn — export it as PNG and try again.",
     );
   }
 

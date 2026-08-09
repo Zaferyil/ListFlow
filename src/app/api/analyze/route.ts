@@ -36,11 +36,11 @@ export async function POST(request: Request) {
     const file = form.get("design");
 
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "Tasarim dosyasi eksik." }, { status: 400 });
+      return NextResponse.json({ error: "No design file was uploaded." }, { status: 400 });
     }
     if (file.size > MAX_BYTES) {
       return NextResponse.json(
-        { error: `Dosya cok buyuk (max ${MAX_BYTES / 1024 / 1024} MB).` },
+        { error: `File is too large (max ${MAX_BYTES / 1024 / 1024} MB).` },
         { status: 413 },
       );
     }
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       } catch (error) {
         // A bad SVG is the seller's file, not a server fault — say so as a 400.
         return NextResponse.json(
-          { error: error instanceof Error ? error.message : "SVG donusturulemedi." },
+          { error: error instanceof Error ? error.message : "Could not convert the SVG." },
           { status: 400 },
         );
       }
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       if (!mediaType) {
         return NextResponse.json(
           {
-            error: `Desteklenmeyen dosya turu: ${file.type || "bilinmiyor"}. PNG, JPEG, WebP, GIF veya SVG yukleyin.`,
+            error: `Unsupported file type: ${file.type || "unknown"}. Upload PNG, JPEG, WebP, GIF or SVG.`,
           },
           { status: 415 },
         );
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ listing, warnings: inspectListing(listing, requiredKeywords) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Beklenmeyen bir hata olustu.";
+    const message = error instanceof Error ? error.message : "Something went wrong.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

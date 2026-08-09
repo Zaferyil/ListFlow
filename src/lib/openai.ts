@@ -15,7 +15,7 @@ let client: OpenAI | null = null;
 export function getClient(): OpenAI {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error(
-      "OPENAI_API_KEY tanimli degil. .env.local dosyasina anahtarinizi ekleyin.",
+      "OPENAI_API_KEY is not set. Add your key to .env.local.",
     );
   }
   client ??= new OpenAI();

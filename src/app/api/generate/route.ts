@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const bodySchema = z.object({
-  niche: z.string().trim().min(2, "Nis basligi cok kisa.").max(500),
+  niche: z.string().trim().min(2, "Niche is too short.").max(500),
   context: z.string().trim().max(2000).optional(),
   requiredKeywords: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
 });
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ listing, warnings: inspectListing(listing, requiredKeywords) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Beklenmeyen bir hata olustu.";
+    const message = error instanceof Error ? error.message : "Something went wrong.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

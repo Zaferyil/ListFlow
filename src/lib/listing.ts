@@ -39,22 +39,23 @@ const LISTING_SCHEMA = {
     description: {
       type: "string",
       description:
-        "Etsy listing description. Open with a one-sentence hook that repeats the main keyword, then cover what the product is, what is included, sizing/format, and usage ideas. Use short paragraphs and a bulleted list.",
+        "Etsy listing description for a printed shirt. Open with a one-sentence hook that repeats the main keyword, then cover what the shirt is, who it suits, the fit and feel, occasions to wear or gift it, and care. Use short paragraphs and a bulleted list.",
     },
     tags: {
       type: "array",
       items: { type: "string" },
-      description: `Exactly ${ETSY_LIMITS.maxTags} Etsy tags, each at most ${ETSY_LIMITS.tagMaxChars} characters. Prefer multi-word long-tail phrases that a buyer would actually type. No duplicated phrases, no single generic words like "gift".`,
+      description: `Exactly ${ETSY_LIMITS.maxTags} Etsy tags, each at most ${ETSY_LIMITS.tagMaxChars} characters. Prefer multi-word long-tail phrases that a buyer would actually type. No duplicated phrases, no single generic words like "gift", and never a file format or download phrase.`,
     },
     materials: {
       type: "array",
       items: { type: "string" },
       description:
-        "Up to 13 materials or file formats (e.g. 'PNG file', 'cotton canvas', 'SVG cut file').",
+        "Up to 13 garment materials and construction details (e.g. 'cotton', 'ring-spun cotton', 'garment-dyed', 'screen print', 'DTG print'). Never a file format.",
     },
     category: {
       type: "string",
-      description: "Suggested Etsy category path, e.g. 'Craft Supplies & Tools > Digital'.",
+      description:
+        "Suggested Etsy category path under Clothing, e.g. 'Clothing > Unisex Adult Clothing > T-Shirts & Tees'.",
     },
     notes: {
       type: "string",
@@ -71,6 +72,12 @@ function systemPrompt(requiredKeywords: string[]): string {
     "You are an Etsy SEO specialist who writes listings that rank in Etsy search and convert browsers into buyers.",
     "You write for the US Etsy market: American English spelling, American sizing conventions, and phrasing a US buyer would use.",
     "",
+    "THE PRODUCT IS ALWAYS A PHYSICAL PRINTED T-SHIRT that the seller prints and ships. It is never a digital file.",
+    "- When you are shown a design, that design is what gets printed on the shirt. The listing sells the finished shirt, not the artwork and not the file.",
+    "- Never write the listing as a digital download, printable, clipart, cut file, or sublimation file, and never say a file is delivered or downloaded.",
+    "- Never put a file format or download phrase in the title, the tags, or the materials: no PNG, SVG, JPG, PDF, EPS, DXF, 'digital download', 'instant download', 'printable', 'downloadable', 'clipart', 'cut file'. A buyer searching those wants a file, not your shirt, so they are the wrong traffic.",
+    "- Write for someone who will wear it or gift it. Cover fit, feel, and occasion instead of file contents.",
+    "",
     "Rules you must follow:",
     `- Title: at most ${ETSY_LIMITS.titleMaxChars} characters, and aim for 110-140 to use the space Etsy gives you.`,
     "- THE OPENING OF THE TITLE IS THE MOST IMPORTANT RANKING SIGNAL. Etsy weights the first few words most heavily, so the first 3-4 words must be, verbatim, the phrase a buyer would type into the search box.",
@@ -78,8 +85,8 @@ function systemPrompt(requiredKeywords: string[]): string {
     "- The opening phrase must also appear among the tags. If you would not use it as a tag, it is not a search phrase and does not belong at the front of the title.",
     `- Tags: exactly ${ETSY_LIMITS.maxTags} tags, each at most ${ETSY_LIMITS.tagMaxChars} characters.`,
     "- Tags must be long-tail buyer phrases, not one-word categories, and must not simply repeat each other.",
-    "- Never invent product attributes you cannot see or were not told. If a detail is unknown, describe the design instead of guessing at dimensions, materials, or shipping.",
-    "- Do not promise licensing terms, delivery times, or refunds.",
+    "- Never invent product attributes you cannot see or were not told. If a detail is unknown, describe the printed design instead of guessing at the blank brand, fabric weight, sizing chart, or shipping.",
+    "- Do not promise delivery times or refunds.",
   ];
 
   if (requiredKeywords.length > 0) {
@@ -120,14 +127,14 @@ async function callModel(content: UserContent[], requiredKeywords: string[]): Pr
   const message = response.choices[0]?.message;
 
   if (message?.refusal) {
-    throw new Error(`Model bu istegi reddetti: ${message.refusal}`);
+    throw new Error(`The model refused this request: ${message.refusal}`);
   }
   // Strict schema output is only complete if generation wasn't cut short.
   if (response.choices[0]?.finish_reason === "length") {
-    throw new Error("Yanit token limitine takildi. Daha kisa bir baglam ile tekrar deneyin.");
+    throw new Error("The response hit the token limit. Try again with shorter context.");
   }
   if (!message?.content) {
-    throw new Error("Model bos yanit dondu. Tekrar deneyin.");
+    throw new Error("The model returned an empty response. Try again.");
   }
 
   return normalizeListing(JSON.parse(message.content) as Listing);
@@ -183,7 +190,7 @@ async function requestListing(
 export function generateFromNiche(niche: string, options: GenerateOptions = {}): Promise<Listing> {
   const extra = options.context?.trim();
   const prompt = [
-    `Write an Etsy listing for this niche/product idea:\n\n${niche}`,
+    `Write an Etsy listing for a printed t-shirt in this niche:\n\n${niche}`,
     extra ? `\n\nSeller context:\n${extra}` : "",
   ].join("");
 
@@ -209,10 +216,11 @@ export function generateFromDesign(
 ): Promise<Listing> {
   const extra = options.context?.trim();
   const prompt = [
-    "Look at this design and write an Etsy listing for the product it would be sold as.",
-    "Describe what you actually see — subject, style, colour palette, typography, mood — and build the keywords from that.",
+    "This design is printed on a t-shirt. Write the Etsy listing for that shirt.",
+    "Describe what you actually see in the design — subject, wording, style, colour palette, typography, mood — and build the keywords from that.",
+    "The design is the shirt's selling point, but the product being sold is the shirt itself.",
     design.flattenedBackground
-      ? `\nThis image was converted from a vector file with a transparent background. The flat ${design.flattenedBackground} backdrop was added by that conversion — it is not part of the design. Ignore it entirely: do not mention it, do not treat it as a colour of the artwork, and assume the design will be printed on whatever the seller chooses.`
+      ? `\nThis image was converted from a vector file with a transparent background. The flat ${design.flattenedBackground} backdrop was added by that conversion — it is not part of the design. Ignore it entirely: do not mention it, do not treat it as a colour of the artwork, and assume the design is printed on the shirt colour the seller chooses.`
       : "",
     extra ? `\nSeller context:\n${extra}` : "",
   ].join("\n");

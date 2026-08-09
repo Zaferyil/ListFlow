@@ -158,19 +158,62 @@ export function missingRequiredKeywords(
 }
 
 /**
+ * Terms that describe a digital product. The shop sells printed shirts, so a
+ * buyer searching these wants a file and will bounce — they are wrong traffic,
+ * not just wrong wording. Matched on word boundaries so "pngs" is caught but a
+ * word merely containing the letters is not.
+ */
+const DIGITAL_TERMS = [
+  "png",
+  "svg",
+  "jpg",
+  "jpeg",
+  "pdf",
+  "eps",
+  "dxf",
+  "clipart",
+  "printable",
+  // "download" on its own covers "instant download", "sublimation download",
+  // and anything else that promises a file rather than a shirt.
+  "download",
+  "downloadable",
+  "digital file",
+  "cut file",
+  "print at home",
+];
+
+/** Digital-product terms present in the fields Etsy matches on. */
+export function digitalTermsIn(listing: Listing): string[] {
+  const haystack = [listing.title, ...listing.tags, ...listing.materials].join(" ").toLowerCase();
+
+  return DIGITAL_TERMS.filter((term) =>
+    new RegExp(`\\b${term.replace(/\s+/g, "\\s+")}s?\\b`).test(haystack),
+  );
+}
+
+/**
  * Reports where the generated listing fell short of Etsy best practice, so the
  * UI can flag it instead of silently shipping a weak listing.
  */
 export function inspectListing(listing: Listing, requiredKeywords: string[] = []): ListingWarning[] {
   const warnings: ListingWarning[] = [];
 
-  const fieldLabels = { title: "baslik", description: "aciklama", tags: "etiketler" } as const;
   for (const missing of missingRequiredKeywords(listing, requiredKeywords)) {
     warnings.push({
       field: "title",
-      message: `"${missing.keyword}" su alanlarda gecmiyor: ${missing.fields
-        .map((field) => fieldLabels[field])
-        .join(", ")}. Etsy bu alanlari ayri ayri esler.`,
+      message: `"${missing.keyword}" is missing from the ${missing.fields.join(
+        " and ",
+      )}. Etsy matches those fields separately.`,
+    });
+  }
+
+  const digital = digitalTermsIn(listing);
+  if (digital.length > 0) {
+    warnings.push({
+      field: "title",
+      message: `Reads like a digital product: ${digital.join(
+        ", ",
+      )}. You sell printed shirts — buyers searching these terms want a file and will bounce.`,
     });
   }
 
@@ -178,26 +221,26 @@ export function inspectListing(listing: Listing, requiredKeywords: string[] = []
     warnings.push({
       field: "title",
       message:
-        "Basligin ilk 3-4 kelimesi bir arama ifadesi gibi durmuyor. Etsy basligin basini en agir sekilde tartar — musterinin yazacagi ifadeyle baslatin.",
+        "The first 3-4 words don't look like a search phrase. Etsy weights the start of the title most heavily — open with what a buyer would type.",
     });
   }
 
   if (listing.title.length < 60) {
     warnings.push({
       field: "title",
-      message: `Baslik ${listing.title.length} karakter. Etsy aramasi icin 100-140 arasi daha iyi calisir.`,
+      message: `Title is ${listing.title.length} characters. Etsy search rewards 100-140.`,
     });
   }
   if (listing.tags.length < ETSY_LIMITS.maxTags) {
     warnings.push({
       field: "tags",
-      message: `${listing.tags.length}/${ETSY_LIMITS.maxTags} etiket kullanildi. 13'unu de doldurmak gorunurlugu artirir.`,
+      message: `Only ${listing.tags.length}/${ETSY_LIMITS.maxTags} tags used. Filling all 13 widens your reach.`,
     });
   }
   if (listing.description.length < 200) {
     warnings.push({
       field: "description",
-      message: "Aciklama cok kisa. Urun detaylari ve kullanim onerileri ekleyin.",
+      message: "Description is thin. Add fit, feel, and occasion details.",
     });
   }
 
