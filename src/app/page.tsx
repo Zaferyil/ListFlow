@@ -167,7 +167,11 @@ function EtsyStep({ listing, productId }: { listing: Listing | null; productId: 
       title="Send to Etsy"
       description="Creates a draft in your shop — nothing goes live until you publish it."
     >
-      <EtsyPanel listing={listing} productId={productId} />
+      <EtsyPanel
+        listing={listing}
+        productId={productId}
+        catalogColors={(findProduct(productId).colors ?? []).join("\n")}
+      />
     </Step>
   );
 }

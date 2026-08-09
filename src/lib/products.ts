@@ -37,6 +37,12 @@ export interface Product {
   materials: string[];
   /** Terms that must appear in title, description and tags for this blank. */
   requiredKeywords: string[];
+  /**
+   * Colourways offered for this blank, used to prefill the Etsy variation
+   * editor. Left empty where the range has not been confirmed — a wrong colour
+   * list would go straight onto a live listing.
+   */
+  colors?: string[];
   source: string;
 }
 
@@ -60,6 +66,32 @@ export const PRODUCTS: Product[] = [
     ],
     materials: ["ring-spun cotton", "garment-dyed cotton", "100% cotton"],
     requiredKeywords: ["Comfort Colors"],
+    colors: [
+      "Black",
+      "Blue Spruce",
+      "Blue Jean",
+      "Blossom",
+      "Chalky Mint",
+      "Crunchberry",
+      "Espresso",
+      "Crimson",
+      "Flo Blue",
+      "Graphite",
+      "Gray",
+      "Ice Blue",
+      "Ivory",
+      "Navy",
+      "Orchid",
+      "Pepper",
+      "Red",
+      "Washed Denim",
+      "Watermelon",
+      "White",
+      "Moss",
+      "Violet",
+      "Yam",
+      "Seafoam",
+    ],
     source: "https://www.ssactivewear.com/p/comfort_colors/1717",
   },
   {

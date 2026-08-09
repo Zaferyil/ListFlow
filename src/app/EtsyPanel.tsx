@@ -95,13 +95,18 @@ function settingsKey(productId: string): string {
   return `listflow.etsy.${productId}`;
 }
 
-function loadSettings(productId: string): PublishSettings {
-  if (typeof window === "undefined") return DEFAULTS;
+/**
+ * Saved settings win; the catalogue's colourways only prefill a blank the
+ * seller has not set up yet, so editing the list is never undone by a reload.
+ */
+function loadSettings(productId: string, catalogColors: string): PublishSettings {
+  const fallback = { ...DEFAULTS, colorsText: catalogColors };
+  if (typeof window === "undefined") return fallback;
   try {
     const stored = window.localStorage.getItem(settingsKey(productId));
-    return stored ? { ...DEFAULTS, ...(JSON.parse(stored) as PublishSettings) } : DEFAULTS;
+    return stored ? { ...fallback, ...(JSON.parse(stored) as PublishSettings) } : fallback;
   } catch {
-    return DEFAULTS;
+    return fallback;
   }
 }
 
@@ -111,7 +116,17 @@ function loadSettings(productId: string): PublishSettings {
  * the page, and a step that only appeared alongside a listing would vanish at
  * exactly the moment it had something to report.
  */
-export function EtsyPanel({ listing, productId }: { listing: Listing | null; productId: string }) {
+export function EtsyPanel({
+  listing,
+  productId,
+  catalogColors,
+}: {
+  listing: Listing | null;
+  productId: string;
+  /** Newline-separated, so the effect below compares by value and does not
+   * reset the seller's edits on every render. */
+  catalogColors: string;
+}) {
   const [status, setStatus] = useState<Status | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [settings, setSettings] = useState<PublishSettings>(DEFAULTS);
@@ -136,9 +151,9 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
 
   // Settings are per-blank, so switching blanks reloads that blank's saved values.
   useEffect(() => {
-    setSettings(loadSettings(productId));
+    setSettings(loadSettings(productId, catalogColors));
     setResult(null);
-  }, [productId]);
+  }, [productId, catalogColors]);
 
   const update = useCallback(
     (patch: Partial<PublishSettings>) => {
