@@ -35,19 +35,15 @@ async function errorFrom(response: Response): Promise<string> {
 function Settings({
   productId,
   onProductChange,
-  extraKeywords,
-  onExtraKeywordsChange,
 }: {
   productId: string;
   onProductChange: (value: string) => void;
-  extraKeywords: string;
-  onExtraKeywordsChange: (value: string) => void;
 }) {
   const product = findProduct(productId);
 
   return (
     <div className="card">
-      <div className="field">
+      <div className="field" style={{ marginBottom: 0 }}>
         <label>Blank</label>
         <div className="choices">
           {PRODUCTS.map((entry) => (
@@ -66,36 +62,23 @@ function Settings({
           {product.composition} · {product.weight} · {product.fit}
           {product.colorCaveat ? ` — ${product.colorCaveat}` : ""}
         </p>
-      </div>
-
-      <div className="field" style={{ marginBottom: 0 }}>
-        <label htmlFor="required-keywords">Extra required keywords (comma separated)</label>
-        <input
-          id="required-keywords"
-          value={extraKeywords}
-          onChange={(event) => onExtraKeywordsChange(event.target.value)}
-          placeholder="e.g. oversized, bachelorette"
-        />
-        <p className="hint">
-          {product.requiredKeywords.length > 0
-            ? `"${product.requiredKeywords.join('", "')}" is already required for this blank. `
-            : ""}
-          Each term goes in the title, description and tags. The first 3-4 words of the title stay
-          the buyer&apos;s search phrase.
-        </p>
+        {product.requiredKeywords.length > 0 && (
+          <p className="hint">
+            &quot;{product.requiredKeywords.join('", "')}&quot; is required in the title, description
+            and tags for this blank.
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
 interface TabProps {
-  requiredKeywords: string[];
   productId: string;
 }
 
-function DesignTab({ requiredKeywords, productId }: TabProps) {
+function DesignTab({ productId }: TabProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [context, setContext] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -108,8 +91,6 @@ function DesignTab({ requiredKeywords, productId }: TabProps) {
 
     const form = new FormData();
     form.set("design", file);
-    form.set("context", context);
-    form.set("requiredKeywords", requiredKeywords.join(","));
     form.set("productId", productId);
 
     try {
@@ -128,16 +109,6 @@ function DesignTab({ requiredKeywords, productId }: TabProps) {
       <div className="card">
         <DropZone file={file} onFileChange={setFile} />
 
-        <div className="field">
-          <label htmlFor="design-context">Extra context (optional)</label>
-          <textarea
-            id="design-context"
-            value={context}
-            onChange={(event) => setContext(event.target.value)}
-            placeholder="e.g. oversized boxy fit, sand and black colorways, gift for new moms"
-          />
-        </div>
-
         <button className="primary" onClick={submit} disabled={!file || loading}>
           {loading ? "Analyzing…" : "Generate listing"}
         </button>
@@ -149,9 +120,8 @@ function DesignTab({ requiredKeywords, productId }: TabProps) {
   );
 }
 
-function NicheTab({ requiredKeywords, productId }: TabProps) {
+function NicheTab({ productId }: TabProps) {
   const [niche, setNiche] = useState("");
-  const [context, setContext] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -164,7 +134,7 @@ function NicheTab({ requiredKeywords, productId }: TabProps) {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ niche, context, requiredKeywords, productId }),
+        body: JSON.stringify({ niche, productId }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       setResult(await response.json());
@@ -185,16 +155,6 @@ function NicheTab({ requiredKeywords, productId }: TabProps) {
             value={niche}
             onChange={(event) => setNiche(event.target.value)}
             placeholder="e.g. retro sunset graphic tee for summer"
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="niche-context">Extra context (optional)</label>
-          <textarea
-            id="niche-context"
-            value={context}
-            onChange={(event) => setContext(event.target.value)}
-            placeholder="Target buyer, shop style, fit…"
           />
         </div>
 
@@ -240,7 +200,7 @@ function LayoutSummary({ layout, pending, skipped }: { layout: LayoutInfo; pendi
   );
 }
 
-function SheetTab({ requiredKeywords, productId }: TabProps) {
+function SheetTab({ productId }: TabProps) {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [sheetName, setSheetName] = useState("Nis Listesi");
   const [limit, setLimit] = useState(5);
@@ -286,7 +246,6 @@ function SheetTab({ requiredKeywords, productId }: TabProps) {
           sheetName,
           limit,
           writeBack,
-          requiredKeywords,
           productId,
         }),
       });
@@ -401,13 +360,6 @@ function SheetTab({ requiredKeywords, productId }: TabProps) {
 export default function Home() {
   const [tab, setTab] = useState<Tab>("design");
   const [productId, setProductId] = useState(DEFAULT_PRODUCT_ID);
-  const [extraKeywords, setExtraKeywords] = useState("");
-
-  const requiredKeywords = extraKeywords
-    .split(",")
-    .map((keyword) => keyword.trim())
-    .filter(Boolean)
-    .slice(0, 5);
 
   return (
     <main className="page">
@@ -431,16 +383,11 @@ export default function Home() {
         </button>
       </div>
 
-      <Settings
-        productId={productId}
-        onProductChange={setProductId}
-        extraKeywords={extraKeywords}
-        onExtraKeywordsChange={setExtraKeywords}
-      />
+      <Settings productId={productId} onProductChange={setProductId} />
 
-      {tab === "design" && <DesignTab requiredKeywords={requiredKeywords} productId={productId} />}
-      {tab === "niche" && <NicheTab requiredKeywords={requiredKeywords} productId={productId} />}
-      {tab === "sheet" && <SheetTab requiredKeywords={requiredKeywords} productId={productId} />}
+      {tab === "design" && <DesignTab productId={productId} />}
+      {tab === "niche" && <NicheTab productId={productId} />}
+      {tab === "sheet" && <SheetTab productId={productId} />}
     </main>
   );
 }

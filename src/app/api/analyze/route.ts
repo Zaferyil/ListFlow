@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { inspectListing } from "@/lib/etsy";
 import { generateFromDesign, type DesignInput } from "@/lib/listing";
-import { allRequiredKeywords } from "@/lib/products";
+import { requiredKeywordsFor } from "@/lib/products";
 import { rasterizeSvg } from "@/lib/svg";
 
 export const runtime = "nodejs";
@@ -77,24 +77,13 @@ export async function POST(request: Request) {
       design = { data: source.toString("base64"), mediaType };
     }
 
-    // Sent as a comma-separated field so the form stays a flat multipart body.
-    const requiredKeywords = String(form.get("requiredKeywords") ?? "")
-      .split(",")
-      .map((keyword) => keyword.trim())
-      .filter(Boolean)
-      .slice(0, 5);
-
     const productId = String(form.get("productId") ?? "") || undefined;
 
-    const listing = await generateFromDesign(design, {
-      context: String(form.get("context") ?? ""),
-      requiredKeywords,
-      productId,
-    });
+    const listing = await generateFromDesign(design, { productId });
 
     return NextResponse.json({
       listing,
-      warnings: inspectListing(listing, allRequiredKeywords(productId, requiredKeywords)),
+      warnings: inspectListing(listing, requiredKeywordsFor(productId)),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Something went wrong.";

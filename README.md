@@ -15,7 +15,7 @@ Etsy listing otomasyonu. İki giriş yolu var:
 
 Bunu sadece prompt'a bırakmıyoruz. Etsy'nin indeksini okuyamayız ama modelin kendi kararını kendisiyle karşılaştırabiliriz: açılış kelimeleri gerçekten arama terimiyse, modelin seçtiği etiketlerde de geçmeleri gerekir. Geçmiyorsa UI uyarı gösterir.
 
-**Zorunlu kelimeler.** Comfort Colors ürünlerinde marka adı otomatik zorunlu olur; kendi terimlerinizi de virgülle ekleyebilirsiniz. Her terim **başlıkta, açıklamada ve en az bir etikette** geçer — Etsy bu üç alanı ayrı ayrı eşler, sadece birinde geçen terim diğer ikisinde görünmez.
+**Zorunlu kelimeler.** Comfort Colors ürünlerinde marka adı otomatik zorunlu olur. Terim **başlıkta, açıklamada ve en az bir etikette** geçer — Etsy bu üç alanı ayrı ayrı eşler, sadece birinde geçen terim diğer ikisinde görünmez.
 
 Bir terim eksik çıkarsa uygulama eksiği açıkça belirten tek bir düzeltme turu atar. Terimi string olarak yamamak yerine yeniden ürettiriyoruz; yamamak anahtar kelime yığınına benzeyen bir başlık üretir. İkinci tur da tutmazsa sonuç yine dönüyor, eksik UI'da işaretleniyor.
 
@@ -89,12 +89,12 @@ Başlık satırı hiç tanınmazsa sütunlar soldan sağa varsayılır (A niş, 
 
 | Endpoint | Ne yapar |
 |---|---|
-| `POST /api/analyze` | multipart: `design`, `context`, `requiredKeywords` (virgülle), `productId` → tek listing |
-| `POST /api/generate` | JSON: `{ niche, context?, requiredKeywords?, productId? }` → tek listing |
+| `POST /api/analyze` | multipart: `design`, `productId` → tek listing |
+| `POST /api/generate` | JSON: `{ niche, productId? }` → tek listing |
 | `GET /api/sheets?spreadsheetId=&sheetName=` | Sütun eşleşmesini ve `New` satır sayısını döner |
-| `POST /api/sheets` | `{ spreadsheetId, sheetName?, limit, writeBack, requiredKeywords?, productId? }` → `New` satırları üretir |
+| `POST /api/sheets` | `{ spreadsheetId, sheetName?, limit, writeBack, productId? }` → `New` satırları üretir |
 
-`requiredKeywords` en fazla 5 terim alır. `productId` verilmezse veya tanınmazsa ilk ürün (Comfort Colors 1717) kullanılır.
+`productId` verilmezse veya tanınmazsa ilk ürün (Comfort Colors 1717) kullanılır. `spreadsheetId` tam URL de kabul eder.
 
 Toplu üretim aynı anda 3 istek çalıştırır (rate limit için). Bir satır başarısız olursa diğerleri devam eder; hata o satırın yanında görünür.
 

@@ -2,15 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { inspectListing } from "@/lib/etsy";
 import { generateFromNiche } from "@/lib/listing";
-import { allRequiredKeywords } from "@/lib/products";
+import { requiredKeywordsFor } from "@/lib/products";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const bodySchema = z.object({
   niche: z.string().trim().min(2, "Niche is too short.").max(500),
-  context: z.string().trim().max(2000).optional(),
-  requiredKeywords: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
   productId: z.string().trim().optional(),
 });
 
@@ -21,10 +19,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { niche, context, requiredKeywords, productId } = parsed.data;
-    const listing = await generateFromNiche(niche, { context, requiredKeywords, productId });
+    const { niche, productId } = parsed.data;
+    const listing = await generateFromNiche(niche, { productId });
 
-    return NextResponse.json({ listing, warnings: inspectListing(listing, allRequiredKeywords(productId, requiredKeywords)) });
+    return NextResponse.json({ listing, warnings: inspectListing(listing, requiredKeywordsFor(productId)) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Something went wrong.";
     return NextResponse.json({ error: message }, { status: 500 });

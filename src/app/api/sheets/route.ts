@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { inspectListing, type Listing } from "@/lib/etsy";
 import { generateFromNiche } from "@/lib/listing";
-import { allRequiredKeywords } from "@/lib/products";
+import { requiredKeywordsFor } from "@/lib/products";
 import {
   columnLetter,
   DEFAULT_SHEET_NAME,
@@ -65,7 +65,6 @@ const generateSchema = z.object({
   // Accepts the full browser URL as well as a bare ID.
   spreadsheetId: z.string().trim().min(1).transform(extractSpreadsheetId),
   sheetName: z.string().trim().min(1).default(DEFAULT_SHEET_NAME),
-  requiredKeywords: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
   productId: z.string().trim().optional(),
   limit: z.number().int().min(1).max(50).default(10),
   /** Off runs a dry pass: listings come back, the sheet is left untouched. */
@@ -95,7 +94,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { spreadsheetId, sheetName, limit, writeBack, requiredKeywords, productId } = parsed.data;
+    const { spreadsheetId, sheetName, limit, writeBack, productId } = parsed.data;
     const { layout, rows } = await readNiches(spreadsheetId, sheetName);
     const pending = rows.filter((row) => row.pending).slice(0, limit);
 
@@ -120,12 +119,12 @@ export async function POST(request: Request) {
         const index = cursor++;
         const entry = pending[index];
         try {
-          const listing = await generateFromNiche(entry.niche, { requiredKeywords, productId });
+          const listing = await generateFromNiche(entry.niche, { productId });
           results[index] = {
             row: entry.row,
             niche: entry.niche,
             listing,
-            warnings: inspectListing(listing, allRequiredKeywords(productId, requiredKeywords)),
+            warnings: inspectListing(listing, requiredKeywordsFor(productId)),
           };
         } catch (error) {
           results[index] = {

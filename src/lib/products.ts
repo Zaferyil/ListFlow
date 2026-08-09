@@ -202,22 +202,11 @@ export function findProduct(id: string | undefined | null): Product {
 }
 
 /**
- * Every term the listing must carry: the blank's own brand plus whatever the
- * seller added. Routes use this so the warnings check the same set the
- * generator was told to satisfy.
+ * Terms the listing must carry for a given blank. Routes use this so the
+ * warnings check the same set the generator was told to satisfy.
  */
-export function allRequiredKeywords(productId: string | undefined, extra: string[]): string[] {
-  const all = [...findProduct(productId).requiredKeywords, ...extra]
-    .map((keyword) => keyword.trim())
-    .filter(Boolean);
-
-  const seen = new Set<string>();
-  return all.filter((keyword) => {
-    const key = keyword.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+export function requiredKeywordsFor(productId: string | undefined): string[] {
+  return findProduct(productId).requiredKeywords;
 }
 
 /** The manufacturer facts the model is allowed to state, as prompt lines. */

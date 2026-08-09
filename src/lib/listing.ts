@@ -12,24 +12,8 @@ import { DEFAULT_PRODUCT_ID, findProduct, productFacts, type Product } from "./p
 type UserContent = OpenAI.Chat.Completions.ChatCompletionContentPart;
 
 export interface GenerateOptions {
-  /** Extra context the seller typed in — shop style, target buyer, colorway. */
-  context?: string;
   /** Which blank the design is printed on. Defaults to the first in the catalog. */
   productId?: string;
-  /** Extra terms the seller wants in the title, description and tags. */
-  requiredKeywords?: string[];
-}
-
-/** The blank's own brand terms plus anything the seller added. */
-function keywordsFor(product: Product, extra: string[] | undefined): string[] {
-  const all = [...product.requiredKeywords, ...(extra ?? [])].map((k) => k.trim()).filter(Boolean);
-  const seen = new Set<string>();
-  return all.filter((keyword) => {
-    const key = keyword.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 const LISTING_SCHEMA = {
@@ -158,7 +142,7 @@ async function requestListing(
   options: GenerateOptions,
 ): Promise<Listing> {
   const product = findProduct(options.productId ?? DEFAULT_PRODUCT_ID);
-  const requiredKeywords = keywordsFor(product, options.requiredKeywords);
+  const requiredKeywords = product.requiredKeywords;
 
   const listing = await callModel(content, product, requiredKeywords);
 
@@ -197,12 +181,8 @@ async function requestListing(
 
 /** Generates a listing from a niche keyword pulled out of a Google Sheet. */
 export function generateFromNiche(niche: string, options: GenerateOptions = {}): Promise<Listing> {
-  const extra = options.context?.trim();
   const product = findProduct(options.productId ?? DEFAULT_PRODUCT_ID);
-  const prompt = [
-    `Write an Etsy listing for a printed ${product.garment} in this niche:\n\n${niche}`,
-    extra ? `\n\nSeller context:\n${extra}` : "",
-  ].join("");
+  const prompt = `Write an Etsy listing for a printed ${product.garment} in this niche:\n\n${niche}`;
 
   return requestListing([{ type: "text", text: prompt }], options);
 }
@@ -224,7 +204,6 @@ export function generateFromDesign(
   design: DesignInput,
   options: GenerateOptions = {},
 ): Promise<Listing> {
-  const extra = options.context?.trim();
   const prompt = [
     `This design is printed on a ${findProduct(options.productId ?? DEFAULT_PRODUCT_ID).garment}. Write the Etsy listing for that garment.`,
     "Describe what you actually see in the design — subject, wording, style, colour palette, typography, mood — and build the keywords from that.",
@@ -232,7 +211,6 @@ export function generateFromDesign(
     design.flattenedBackground
       ? `\nThis image was converted from a vector file with a transparent background. The flat ${design.flattenedBackground} backdrop was added by that conversion — it is not part of the design. Ignore it entirely: do not mention it, do not treat it as a colour of the artwork, and assume the design is printed on the garment colour the seller chooses.`
       : "",
-    extra ? `\nSeller context:\n${extra}` : "",
   ].join("\n");
 
   return requestListing(
