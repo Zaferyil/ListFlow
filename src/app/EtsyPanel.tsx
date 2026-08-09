@@ -173,6 +173,7 @@ export function EtsyPanel({
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
 
   // The OAuth callback reports back through ?etsy=…; show it here rather than
   // leaving the seller to read it out of the address bar.
@@ -196,6 +197,7 @@ export function EtsyPanel({
   // Template photos belong to the blank, so they reload with it.
   useEffect(() => {
     setTemplateError(null);
+    setSelected([]);
     fetch(`/api/etsy/templates?productId=${encodeURIComponent(productId)}`)
       .then((response) => response.json())
       .then((body) => setTemplates(body.images ?? []))
@@ -245,11 +247,16 @@ export function EtsyPanel({
     if (body.images) setTemplates(body.images);
   }
 
-  async function removeTemplate(name: string) {
-    const params = new URLSearchParams({ productId, file: name });
+  async function removeSelected() {
+    if (selected.length === 0) return;
+
+    const params = new URLSearchParams({ productId });
+    for (const name of selected) params.append("file", name);
+
     const response = await fetch(`/api/etsy/templates?${params}`, { method: "DELETE" });
     const body = await response.json();
     setTemplates(body.images ?? []);
+    setSelected([]);
   }
 
   const update = useCallback(
@@ -593,7 +600,27 @@ export function EtsyPanel({
               <li
                 key={image.name}
                 draggable
-                className={draggingIndex === index ? "dragging" : ""}
+                role="checkbox"
+                aria-checked={selected.includes(image.name)}
+                tabIndex={0}
+                className={`${draggingIndex === index ? "dragging" : ""}${selected.includes(image.name) ? " selected" : ""}`}
+                onClick={() =>
+                  setSelected((current) =>
+                    current.includes(image.name)
+                      ? current.filter((name) => name !== image.name)
+                      : [...current, image.name],
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (event.key === " " || event.key === "Enter") {
+                    event.preventDefault();
+                    setSelected((current) =>
+                      current.includes(image.name)
+                        ? current.filter((name) => name !== image.name)
+                        : [...current, image.name],
+                    );
+                  }
+                }}
                 onDragStart={(event) => {
                   setDraggingIndex(index);
                   event.dataTransfer.effectAllowed = "move";
@@ -627,7 +654,11 @@ export function EtsyPanel({
                   </strong>
                   {formatSize(image.size)}
                 </span>
-                <span className="template-actions">
+                <span
+                  className="template-actions"
+                  // The arrows reorder; they must not also toggle the row.
+                  onClick={(event) => event.stopPropagation()}
+                >
                   {/* Dragging is the quick way; the arrows make it precise and
                       reachable without a mouse. */}
                   <button
@@ -648,19 +679,35 @@ export function EtsyPanel({
                   >
                     ↓
                   </button>
-                  <button type="button" className="linklike" onClick={() => removeTemplate(image.name)}>
-                    Remove
-                  </button>
                 </span>
               </li>
             ))}
           </ul>
         )}
+        {templates.length > 0 && (
+          <div className="actions" style={{ marginTop: "0.75rem" }}>
+            <button
+              type="button"
+              className="ghost"
+              disabled={selected.length === 0}
+              onClick={removeSelected}
+            >
+              {selected.length === 0
+                ? "Select photos to remove"
+                : `Remove ${selected.length} selected`}
+            </button>
+            {selected.length > 0 && (
+              <button type="button" className="ghost" onClick={() => setSelected([])}>
+                Clear selection
+              </button>
+            )}
+          </div>
+        )}
         {templateError && <div className="alert error">{templateError}</div>}
         <p className="hint">
           Added to every listing for this blank — size chart, care card, colour chart. Uploaded top
-          to bottom; drag a row, or use the arrows, to rearrange. Etsy allows 10 photos and shows
-          the first as the search thumbnail.
+          to bottom; drag a row, or use the arrows, to rearrange. Click rows to select them, then
+          remove them together. Etsy allows 10 photos and shows the first as the search thumbnail.
         </p>
       </div>
 

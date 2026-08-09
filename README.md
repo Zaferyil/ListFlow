@@ -127,6 +127,7 @@ Her listing'e giren sabit görseller (beden tablosu, yıkama talimatı, renk kar
 - Paneldeki **Template photos** alanına sürükleyip bırakın (ya da tıklayıp seçin). PNG, JPEG, GIF; dosya başına en fazla 20 MB.
 - **Listedeki sırayla** yüklenir. Sırayı fareyle sürükleyerek ya da ↑ ↓ oklarıyla değiştirirsiniz; seçim `.data/templates/<blank-id>/.order.json` içinde saklanır. Etsy ilk görseli aramada çıkan küçük resim olarak kullanıyor.
 - Sonradan eklenen görsel listenin sonuna gelir; silinen bir görsel sıradan da düşer.
+- Silmek için satırlara tıklayıp işaretleyin, sonra **Remove N selected** ile hepsini bir kerede silin.
 - Etsy listing başına 10 görsele izin veriyor; 10'dan fazlası kabul edilmiyor.
 - Dosyalar `.data/templates/<blank-id>/` altında tutuluyor (gitignore'da). Dosya adları tarayıcıdan geldiği için yeniden kurgulanıyor — `../` içeren bir ad klasörün dışına çıkamaz.
 

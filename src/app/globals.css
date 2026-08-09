@@ -781,3 +781,19 @@ button.linklike {
   padding: 0.2rem 0.5rem;
   line-height: 1.2;
 }
+
+.templates li.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* A tick in place of the grip, so the selected rows read at a glance. */
+.templates li.selected .grip::before {
+  content: "✓";
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.templates li.selected .grip {
+  font-size: 0;
+}

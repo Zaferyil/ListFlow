@@ -96,14 +96,18 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ images: await setOrder(productId, body.order) });
 }
 
+/** `file` may repeat, so a whole selection is removed in one request. */
 export async function DELETE(request: Request) {
   const productId = productIdFrom(request.url);
-  const file = new URL(request.url).searchParams.get("file");
+  const files = new URL(request.url).searchParams.getAll("file");
 
-  if (!productId || !file) {
+  if (!productId || files.length === 0) {
     return NextResponse.json({ error: "productId and file are required." }, { status: 400 });
   }
 
-  await deleteTemplate(productId, file);
+  for (const file of files) {
+    await deleteTemplate(productId, file);
+  }
+
   return NextResponse.json({ images: await listTemplates(productId) });
 }
