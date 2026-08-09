@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { inspectListing } from "@/lib/etsy";
+import { generateFromNiche } from "@/lib/listing";
+
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
+const bodySchema = z.object({
+  niche: z.string().trim().min(2, "Nis basligi cok kisa.").max(500),
+  context: z.string().trim().max(2000).optional(),
+  language: z.enum(["tr", "en"]).default("en"),
+});
+
+export async function POST(request: Request) {
+  try {
+    const parsed = bodySchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const { niche, context, language } = parsed.data;
+    const listing = await generateFromNiche(niche, { context, language });
+
+    return NextResponse.json({ listing, warnings: inspectListing(listing) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Beklenmeyen bir hata olustu.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
