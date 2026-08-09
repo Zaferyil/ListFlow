@@ -85,6 +85,34 @@ Başlık satırı hiç tanınmazsa sütunlar soldan sağa varsayılır (A niş, 
 
 Üretimi başarısız olan satır `New` kalır, sonraki çalıştırmada tekrar denenir. **Max rows per run** sınırı aşılırsa kalan satır sayısı bildirilir; butona tekrar basarak devam edersiniz.
 
+## Etsy'ye taslak gönderme (opsiyonel)
+
+Listing üretildikten sonra **4. adım** çıkar: sonucu doğrudan mağazanıza **taslak (draft)** olarak gönderir. Taslak yayında değildir, listeleme ücreti kesilmez — mockup görsellerini Etsy'de ekleyip kendiniz yayınlarsınız.
+
+Kurulum:
+
+1. https://www.etsy.com/developers/your-apps → uygulamanızın **Keystring** değerini alın.
+2. Aynı sayfada **Callback URL** olarak `http://localhost:3000/api/etsy/callback` ekleyin (deploy ederseniz kendi alan adınızla aynısını ekleyin).
+3. `.env.local` içine yazın — anahtarı hiçbir yere yapıştırmayın, sadece bu dosyaya:
+
+   ```
+   ETSY_KEYSTRING=...
+   ETSY_REDIRECT_URI=http://localhost:3000/api/etsy/callback
+   ```
+
+4. Sunucuyu yeniden başlatın, 4. adımdaki **Connect to Etsy** ile mağazanızı yetkilendirin.
+
+Bağlantı `.data/etsy-tokens.json` içinde tutulur (gitignore'da). Access token 1 saat, refresh token 90 gün geçerli; süre dolunca otomatik yenilenir, 90 günden sonra tekrar bağlanmanız istenir.
+
+Panelde kategori, kargo profili, fiyat, adet, "who made" ve "when made" seçersiniz. Bu ayarlar **ürün bazında** tarayıcıda saklanır, her listingde tekrar girmezsiniz. Varsayılanlar: 24.99 USD, 999 adet, *I did*, *Made to order*.
+
+Notlar:
+
+- Baskıyı bir print partner yapıyorsa Etsy "Another company or person" bekler ve partneri mağaza ayarlarında tanımlamanızı ister.
+- Açıklamadaki emoji, API ile açılan taslağı Etsy arayüzünde düzenlenemez hâle getiriyor (Etsy tarafında bilinen bir hata). Bu yüzden **gönderilen** metinden emoji temizlenir; sizin kopyaladığınız metin aynı kalır.
+- Görsel yüklenmez — mockup'ları Etsy'de eklersiniz.
+- Şu an sadece Design ve Niche sekmelerinde çıkar; Google Sheet toplu üretimi hâlâ sheet'e yazar.
+
 ## API
 
 | Endpoint | Ne yapar |
@@ -93,6 +121,11 @@ Başlık satırı hiç tanınmazsa sütunlar soldan sağa varsayılır (A niş, 
 | `POST /api/generate` | JSON: `{ niche, productId? }` → tek listing |
 | `GET /api/sheets?spreadsheetId=&sheetName=` | Sütun eşleşmesini ve `New` satır sayısını döner |
 | `POST /api/sheets` | `{ spreadsheetId, sheetName?, limit, writeBack, productId? }` → `New` satırları üretir |
+| `GET /api/etsy/connect` | OAuth 2.0 + PKCE akışını başlatır |
+| `GET /api/etsy/callback` | Etsy dönüşü; token'ları saklar |
+| `GET /api/etsy/status` | Bağlantı durumu, mağaza ve kargo profilleri (`DELETE` bağlantıyı keser) |
+| `GET /api/etsy/taxonomy` | Etsy kategori ağacı (Clothing dalı, günlük cache) |
+| `POST /api/etsy/publish` | Listing'i taslak olarak mağazaya gönderir |
 
 `productId` verilmezse veya tanınmazsa ilk ürün (Comfort Colors 1717) kullanılır. `spreadsheetId` tam URL de kabul eder.
 
@@ -107,10 +140,13 @@ src/lib/listing.ts    Prompt + structured output şeması
 src/lib/svg.ts        SVG → PNG rasterizer
 src/lib/sheets.ts     Google Sheets okuma/yazma
 src/lib/openai.ts    API istemcisi
+src/lib/etsy-api.ts   Etsy Open API v3 (OAuth + PKCE, taslak oluşturma)
+src/lib/etsy-tokens.ts  Etsy token deposu (.data/, otomatik yenileme)
 src/app/api/*         Route handler'lar
 src/app/page.tsx      UI (3 sekme)
 src/app/DropZone.tsx  Sürükle-bırak dosya alanı
 src/app/ListingCard.tsx  Sonuç kartı
+src/app/EtsyPanel.tsx    Etsy'ye taslak gönderme paneli (4. adım)
 ```
 
 ## Model
@@ -129,4 +165,5 @@ Varsayılan `gpt-5.4`. `OPENAI_MODEL` ile değiştirebilirsiniz — vision ve st
 
 - Katalogdaki spec'ler dışında model ürün özelliği uyduramaz. Beden tablosu, baskı yöntemi ve kargo hâlâ bilinmiyor sayılır — listelemeden önce kendiniz ekleyin.
 - Arayüz ve listing çıktısı İngilizce; çıktı ABD pazarına göre yazılır (Amerikan imlası, ABD beden/ölçü alışkanlıkları).
+- Etsy token deposu diske yazıyor; bu kendi bilgisayarınızda çalışır. Vercel'e deploy ederseniz her istek boş bir dosya sistemiyle başlar, o yüzden orada gerçek bir depo (ör. Vercel KV) gerekir — `src/lib/etsy-tokens.ts` içindeki `load`/`save` değişince gerisi aynı kalır.
 - Etiket sayısı 13'ün altında kalırsa, başlık kısa çıkarsa, başlık arama ifadesiyle başlamazsa veya zorunlu bir kelime üç alandan birinde eksikse UI uyarı gösterir.

@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { Listing, ListingWarning } from "@/lib/etsy";
 import { DEFAULT_PRODUCT_ID, findProduct, PRODUCTS } from "@/lib/products";
 import { DropZone } from "./DropZone";
+import { EtsyPanel } from "./EtsyPanel";
 import { ListingCard } from "./ListingCard";
 
 type Tab = "design" | "niche" | "sheet";
@@ -152,7 +153,22 @@ function DesignTab({ productId }: TabProps) {
           </div>
         )}
       </Step>
+
+      {result && <EtsyStep listing={result.listing} productId={productId} />}
     </>
+  );
+}
+
+/** Step 4 only exists once there is a listing worth sending. */
+function EtsyStep({ listing, productId }: { listing: Listing; productId: string }) {
+  return (
+    <Step
+      number={4}
+      title="Send to Etsy"
+      description="Creates a draft in your shop — nothing goes live until you publish it."
+    >
+      <EtsyPanel listing={listing} productId={productId} />
+    </Step>
   );
 }
 
@@ -211,6 +227,8 @@ function NicheTab({ productId }: TabProps) {
           </div>
         )}
       </Step>
+
+      {result && <EtsyStep listing={result.listing} productId={productId} />}
     </>
   );
 }
