@@ -52,10 +52,10 @@ C–E sütunları sadece "Sonuçları sheet'e geri yaz" işaretliyse doldurulur.
 
 | Endpoint | Ne yapar |
 |---|---|
-| `POST /api/analyze` | multipart: `design` (görsel), `context`, `language`, `requiredKeywords` (virgülle) → tek listing |
-| `POST /api/generate` | JSON: `{ niche, context?, language?, requiredKeywords? }` → tek listing |
+| `POST /api/analyze` | multipart: `design` (görsel), `context`, `requiredKeywords` (virgülle) → tek listing |
+| `POST /api/generate` | JSON: `{ niche, context?, requiredKeywords? }` → tek listing |
 | `GET /api/sheets?spreadsheetId=&range=` | Sheet'teki nişleri önizler |
-| `POST /api/sheets` | `{ spreadsheetId, range, limit, language, writeBack, requiredKeywords? }` → toplu üretim |
+| `POST /api/sheets` | `{ spreadsheetId, range, limit, writeBack, requiredKeywords? }` → toplu üretim |
 
 `requiredKeywords` en fazla 5 terim alır.
 
@@ -87,5 +87,5 @@ Varsayılan `gpt-5.4`. `OPENAI_MODEL` ile değiştirebilirsiniz — vision ve st
 ## Notlar
 
 - Model ölçü, kargo süresi, lisans koşulu gibi doğrulanamayan detayları uydurmaması için sistem prompt'unda kısıtlandı — bu alanları listelemeden önce kendiniz kontrol edin.
-- Türkçe seçildiğinde metin Türkçe, **etiketler İngilizce** üretilir; Etsy alıcı tabanı İngilizce arıyor.
+- Listing çıktısı her zaman **İngilizce** ve ABD pazarına göre yazılır (Amerikan imlası, ABD beden/ölçü alışkanlıkları). Arayüz Türkçe.
 - Etiket sayısı 13'ün altında kalırsa, başlık kısa çıkarsa, başlık arama ifadesiyle başlamazsa veya zorunlu bir kelime üç alandan birinde eksikse UI uyarı gösterir.

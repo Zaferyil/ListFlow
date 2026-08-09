@@ -5,7 +5,6 @@ import type { Listing, ListingWarning } from "@/lib/etsy";
 import { ListingCard } from "./ListingCard";
 
 type Tab = "design" | "niche" | "sheet";
-type Language = "tr" | "en";
 
 interface SingleResult {
   listing: Listing;
@@ -34,15 +33,11 @@ async function errorFrom(response: Response): Promise<string> {
 const COMFORT_COLORS = "Comfort Colors";
 
 function Settings({
-  language,
-  onLanguageChange,
   comfortColors,
   onComfortColorsChange,
   extraKeywords,
   onExtraKeywordsChange,
 }: {
-  language: Language;
-  onLanguageChange: (value: Language) => void;
   comfortColors: boolean;
   onComfortColorsChange: (value: boolean) => void;
   extraKeywords: string;
@@ -50,18 +45,6 @@ function Settings({
 }) {
   return (
     <div className="card">
-      <div className="field">
-        <label htmlFor="language">Listing dili</label>
-        <select
-          id="language"
-          value={language}
-          onChange={(event) => onLanguageChange(event.target.value as Language)}
-        >
-          <option value="en">Ingilizce (onerilen — Etsy alicilari)</option>
-          <option value="tr">Turkce metin + Ingilizce etiketler</option>
-        </select>
-      </div>
-
       <label className="checkbox" style={{ marginBottom: "0.75rem" }}>
         <input
           type="checkbox"
@@ -90,11 +73,10 @@ function Settings({
 }
 
 interface TabProps {
-  language: Language;
   requiredKeywords: string[];
 }
 
-function DesignTab({ language, requiredKeywords }: TabProps) {
+function DesignTab({ requiredKeywords }: TabProps) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [context, setContext] = useState("");
@@ -122,7 +104,6 @@ function DesignTab({ language, requiredKeywords }: TabProps) {
     const form = new FormData();
     form.set("design", file);
     form.set("context", context);
-    form.set("language", language);
     form.set("requiredKeywords", requiredKeywords.join(","));
 
     try {
@@ -176,7 +157,7 @@ function DesignTab({ language, requiredKeywords }: TabProps) {
   );
 }
 
-function NicheTab({ language, requiredKeywords }: TabProps) {
+function NicheTab({ requiredKeywords }: TabProps) {
   const [niche, setNiche] = useState("");
   const [context, setContext] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
@@ -191,7 +172,7 @@ function NicheTab({ language, requiredKeywords }: TabProps) {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ niche, context, language, requiredKeywords }),
+        body: JSON.stringify({ niche, context, requiredKeywords }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       setResult(await response.json());
@@ -236,7 +217,7 @@ function NicheTab({ language, requiredKeywords }: TabProps) {
   );
 }
 
-function SheetTab({ language, requiredKeywords }: TabProps) {
+function SheetTab({ requiredKeywords }: TabProps) {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [range, setRange] = useState("Sheet1!A:B");
   const [limit, setLimit] = useState(5);
@@ -276,14 +257,7 @@ function SheetTab({ language, requiredKeywords }: TabProps) {
       const response = await fetch("/api/sheets", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          spreadsheetId,
-          range,
-          language,
-          limit,
-          writeBack,
-          requiredKeywords,
-        }),
+        body: JSON.stringify({ spreadsheetId, range, limit, writeBack, requiredKeywords }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       const body = await response.json();
@@ -382,7 +356,6 @@ function SheetTab({ language, requiredKeywords }: TabProps) {
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("design");
-  const [language, setLanguage] = useState<Language>("en");
   const [comfortColors, setComfortColors] = useState(false);
   const [extraKeywords, setExtraKeywords] = useState("");
 
@@ -417,17 +390,15 @@ export default function Home() {
       </div>
 
       <Settings
-        language={language}
-        onLanguageChange={setLanguage}
         comfortColors={comfortColors}
         onComfortColorsChange={setComfortColors}
         extraKeywords={extraKeywords}
         onExtraKeywordsChange={setExtraKeywords}
       />
 
-      {tab === "design" && <DesignTab language={language} requiredKeywords={requiredKeywords} />}
-      {tab === "niche" && <NicheTab language={language} requiredKeywords={requiredKeywords} />}
-      {tab === "sheet" && <SheetTab language={language} requiredKeywords={requiredKeywords} />}
+      {tab === "design" && <DesignTab requiredKeywords={requiredKeywords} />}
+      {tab === "niche" && <NicheTab requiredKeywords={requiredKeywords} />}
+      {tab === "sheet" && <SheetTab requiredKeywords={requiredKeywords} />}
     </main>
   );
 }

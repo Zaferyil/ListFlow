@@ -9,7 +9,6 @@ export const maxDuration = 120;
 const bodySchema = z.object({
   niche: z.string().trim().min(2, "Nis basligi cok kisa.").max(500),
   context: z.string().trim().max(2000).optional(),
-  language: z.enum(["tr", "en"]).default("en"),
   requiredKeywords: z.array(z.string().trim().min(1).max(60)).max(5).default([]),
 });
 
@@ -20,8 +19,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { niche, context, language, requiredKeywords } = parsed.data;
-    const listing = await generateFromNiche(niche, { context, language, requiredKeywords });
+    const { niche, context, requiredKeywords } = parsed.data;
+    const listing = await generateFromNiche(niche, { context, requiredKeywords });
 
     return NextResponse.json({ listing, warnings: inspectListing(listing, requiredKeywords) });
   } catch (error) {

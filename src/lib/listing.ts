@@ -4,13 +4,9 @@ import { ETSY_LIMITS, type Listing, missingRequiredKeywords, normalizeListing } 
 
 type UserContent = OpenAI.Chat.Completions.ChatCompletionContentPart;
 
-export type Language = "tr" | "en";
-
 export interface GenerateOptions {
   /** Extra context the seller typed in — shop style, target buyer, product type. */
   context?: string;
-  /** Language the listing copy should be written in. Etsy US buyers → "en". */
-  language?: Language;
   /**
    * Terms that must appear in the title, the description and at least one tag —
    * typically a garment brand such as "Comfort Colors" that buyers search by.
@@ -70,14 +66,10 @@ const LISTING_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-function systemPrompt(language: Language, requiredKeywords: string[]): string {
-  const languageRule =
-    language === "tr"
-      ? "Write the listing copy in Turkish, but keep the tags in English — Etsy's buyer base searches in English."
-      : "Write everything in English.";
-
+function systemPrompt(requiredKeywords: string[]): string {
   const lines = [
     "You are an Etsy SEO specialist who writes listings that rank in Etsy search and convert browsers into buyers.",
+    "You write for the US Etsy market: American English spelling, American sizing conventions, and phrasing a US buyer would use.",
     "",
     "Rules you must follow:",
     `- Title: at most ${ETSY_LIMITS.titleMaxChars} characters, and aim for 110-140 to use the space Etsy gives you.`,
@@ -88,7 +80,6 @@ function systemPrompt(language: Language, requiredKeywords: string[]): string {
     "- Tags must be long-tail buyer phrases, not one-word categories, and must not simply repeat each other.",
     "- Never invent product attributes you cannot see or were not told. If a detail is unknown, describe the design instead of guessing at dimensions, materials, or shipping.",
     "- Do not promise licensing terms, delivery times, or refunds.",
-    languageRule,
   ];
 
   if (requiredKeywords.length > 0) {
@@ -112,11 +103,7 @@ function systemPrompt(language: Language, requiredKeywords: string[]): string {
 }
 
 /** One structured-output call. */
-async function callModel(
-  content: UserContent[],
-  language: Language,
-  requiredKeywords: string[],
-): Promise<Listing> {
+async function callModel(content: UserContent[], requiredKeywords: string[]): Promise<Listing> {
   const response = await getClient().chat.completions.create({
     model: MODEL,
     max_completion_tokens: 4000,
@@ -125,7 +112,7 @@ async function callModel(
       json_schema: { name: "etsy_listing", strict: true, schema: LISTING_SCHEMA },
     },
     messages: [
-      { role: "system", content: systemPrompt(language, requiredKeywords) },
+      { role: "system", content: systemPrompt(requiredKeywords) },
       { role: "user", content },
     ],
   });
@@ -156,10 +143,9 @@ async function requestListing(
   content: UserContent[],
   options: GenerateOptions,
 ): Promise<Listing> {
-  const language = options.language ?? "en";
   const requiredKeywords = (options.requiredKeywords ?? []).map((k) => k.trim()).filter(Boolean);
 
-  const listing = await callModel(content, language, requiredKeywords);
+  const listing = await callModel(content, requiredKeywords);
 
   const missing = missingRequiredKeywords(listing, requiredKeywords);
   if (missing.length === 0) return listing;
@@ -183,7 +169,6 @@ async function requestListing(
         ].join("\n"),
       },
     ],
-    language,
     requiredKeywords,
   );
 

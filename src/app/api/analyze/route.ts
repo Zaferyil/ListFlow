@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { inspectListing } from "@/lib/etsy";
-import { generateFromDesign, type DesignInput, type Language } from "@/lib/listing";
+import { generateFromDesign, type DesignInput } from "@/lib/listing";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -39,7 +39,6 @@ export async function POST(request: Request) {
     }
 
     const data = Buffer.from(await file.arrayBuffer()).toString("base64");
-    const language = form.get("language") === "tr" ? "tr" : ("en" satisfies Language);
 
     // Sent as a comma-separated field so the form stays a flat multipart body.
     const requiredKeywords = String(form.get("requiredKeywords") ?? "")
@@ -50,7 +49,7 @@ export async function POST(request: Request) {
 
     const listing = await generateFromDesign(
       { data, mediaType },
-      { language, context: String(form.get("context") ?? ""), requiredKeywords },
+      { context: String(form.get("context") ?? ""), requiredKeywords },
     );
 
     return NextResponse.json({ listing, warnings: inspectListing(listing, requiredKeywords) });
