@@ -2,7 +2,7 @@
 
 Etsy listing otomasyonu. İki giriş yolu var:
 
-1. **Tasarım yükle** — Model görseli analiz eder (konu, stil, renk paleti, tipografi) ve buradan başlık/açıklama/etiket üretir.
+1. **Tasarım yükle** — Model görseli analiz eder (konu, stil, renk paleti, tipografi) ve buradan başlık/açıklama/etiket üretir. PNG, JPEG, WebP, GIF ve SVG kabul eder.
 2. **Google Sheet** — A sütunundaki niş başlıklarını çeker, toplu üretir, isterseniz sonuçları aynı satırlara geri yazar.
 
 Üçüncü bir sekme (Tek niş) sheet'e gerek kalmadan elle niş girmek için.
@@ -20,6 +20,14 @@ Bunu sadece prompt'a bırakmıyoruz. Etsy'nin indeksini okuyamayız ama modelin 
 Bir terim eksik çıkarsa uygulama eksiği açıkça belirten tek bir düzeltme turu atar. Terimi string olarak yamamak yerine yeniden ürettiriyoruz; yamamak anahtar kelime yığınına benzeyen bir başlık üretir. İkinci tur da tutmazsa sonuç yine dönüyor, eksik UI'da işaretleniyor.
 
 Comfort Colors için modele markanın ne olduğu (ağır gramajlı, garment-dyed ring-spun pamuk, rahat unisex kalıp) bilgi olarak veriliyor — aksi halde ya kumaşı uyduruyor ya da etrafından dolaşıyor.
+
+### SVG dosyaları
+
+Vision modelleri SVG kabul etmiyor, o yüzden yüklenen SVG sunucuda PNG'ye çevriliyor (resvg ile — script çalıştırmaz ve dış kaynak çekmez, yüklenen dosya güvenilmez girdi olduğu için önemli).
+
+Şeffaf zeminde bir tuzak var: cut file'lar genelde tek renk. Beyaz bir tasarımı beyaz zemine bindirirseniz modele boş görsel gitmiş olur. Bu yüzden çevirmeden önce tasarımın parlaklığı ölçülüyor ve zemin ona göre seçiliyor — koyu tasarım açık zemine, açık tasarım koyu zemine biniyor. Modele de bu zeminin sonradan eklendiği, tasarımın parçası olmadığı söyleniyor; yoksa açıklamaya "beyaz arka planlı" diye yazıyor.
+
+Çizim üretmeyen SVG (gömülü yazı tipi eksik, dış kaynağa bağımlı) yüklenirse istek API'ye hiç gitmeden hata veriyor.
 
 ## Kurulum
 

@@ -121,11 +121,11 @@ function DesignTab({ requiredKeywords }: TabProps) {
     <>
       <div className="card">
         <div className="field">
-          <label htmlFor="design">Tasarim dosyasi (PNG, JPEG, WebP, GIF — max 8 MB)</label>
+          <label htmlFor="design">Tasarim dosyasi (PNG, JPEG, WebP, GIF, SVG — max 8 MB)</label>
           <input
             id="design"
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.svg"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
         </div>

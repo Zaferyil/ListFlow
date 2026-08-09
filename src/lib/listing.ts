@@ -194,6 +194,12 @@ export interface DesignInput {
   /** Base64-encoded image data, without the data: URI prefix. */
   data: string;
   mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+  /**
+   * Set when the image came from a vector file we rasterised ourselves. The
+   * background is then ours, not the seller's, and must not be described as
+   * part of the artwork.
+   */
+  flattenedBackground?: "light" | "dark";
 }
 
 /** Generates a listing by looking at an uploaded design file. */
@@ -205,6 +211,9 @@ export function generateFromDesign(
   const prompt = [
     "Look at this design and write an Etsy listing for the product it would be sold as.",
     "Describe what you actually see — subject, style, colour palette, typography, mood — and build the keywords from that.",
+    design.flattenedBackground
+      ? `\nThis image was converted from a vector file with a transparent background. The flat ${design.flattenedBackground} backdrop was added by that conversion — it is not part of the design. Ignore it entirely: do not mention it, do not treat it as a colour of the artwork, and assume the design will be printed on whatever the seller chooses.`
+      : "",
     extra ? `\nSeller context:\n${extra}` : "",
   ].join("\n");
 
