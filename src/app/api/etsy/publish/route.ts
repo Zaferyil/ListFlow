@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createDraftListing, getShop, updateListingInventory } from "@/lib/etsy-api";
+import {
+  createDraftListing,
+  getShop,
+  updateListingInventory,
+  uploadListingImage,
+} from "@/lib/etsy-api";
+import { contentTypeFor, listTemplates, readTemplate } from "@/lib/etsy-templates";
 import { getAccessToken } from "@/lib/etsy-tokens";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const variationsSchema = z.object({
   sizeLabel: z.string().trim().min(1).max(45),
@@ -28,6 +34,8 @@ const bodySchema = z.object({
   whoMade: z.enum(["i_did", "someone_else", "collective"]),
   whenMade: z.string().trim().min(1),
   variations: variationsSchema.optional(),
+  /** Which blank's template photos to attach. */
+  productId: z.string().trim().min(1).optional(),
 });
 
 /** Pushes one generated listing to Etsy as a draft. Nothing is published live. */
@@ -38,7 +46,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { variations, ...draft } = parsed.data;
+    const { variations, productId, ...draft } = parsed.data;
     const accessToken = await getAccessToken();
     const shop = await getShop(accessToken);
 
@@ -50,27 +58,56 @@ export async function POST(request: Request) {
 
     const listing = await createDraftListing(accessToken, shop.shopId, { ...draft, price });
 
-    if (!variations) {
-      return NextResponse.json({ listing, shop });
+    // Past this point the draft exists, so a later failure is reported
+    // alongside its link rather than thrown — otherwise the seller is left
+    // with an orphan they never hear about.
+    let variationError: string | undefined;
+    let imageError: string | undefined;
+
+    if (variations) {
+      try {
+        await updateListingInventory(accessToken, listing.listingId, {
+          ...variations,
+          quantity: draft.quantity,
+          readinessStateId: draft.readinessStateId,
+        });
+      } catch (error) {
+        variationError = error instanceof Error ? error.message : "Could not add the variations.";
+      }
     }
 
-    try {
-      await updateListingInventory(accessToken, listing.listingId, {
-        ...variations,
-        quantity: draft.quantity,
-        readinessStateId: draft.readinessStateId,
-      });
-    } catch (error) {
-      // The draft exists at this point, so losing it in a 500 would leave an
-      // orphan the seller never hears about.
-      return NextResponse.json({
-        listing,
-        shop,
-        variationError: error instanceof Error ? error.message : "Could not add the variations.",
-      });
+    let uploaded = 0;
+    if (productId) {
+      const templates = await listTemplates(productId);
+      try {
+        for (const [index, template] of templates.entries()) {
+          await uploadListingImage(
+            accessToken,
+            shop.shopId,
+            listing.listingId,
+            {
+              name: template.name,
+              type: contentTypeFor(template.name),
+              bytes: await readTemplate(productId, template.name),
+            },
+            index + 1,
+          );
+          uploaded += 1;
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "upload failed";
+        imageError = `${uploaded} of ${templates.length} photos uploaded — ${reason}`;
+      }
     }
 
-    return NextResponse.json({ listing, shop, variations: true });
+    return NextResponse.json({
+      listing,
+      shop,
+      variations: Boolean(variations) && !variationError,
+      variationError,
+      uploaded,
+      imageError,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not create the draft.";
     return NextResponse.json({ error: message }, { status: 500 });

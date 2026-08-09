@@ -31,6 +31,19 @@ interface PublishResult {
   listing: { url: string; listingId: number };
   variations?: boolean;
   variationError?: string;
+  uploaded?: number;
+  imageError?: string;
+}
+
+interface TemplateImage {
+  name: string;
+  size: number;
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /**
@@ -155,6 +168,9 @@ export function EtsyPanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [callbackNote, setCallbackNote] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<TemplateImage[]>([]);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // The OAuth callback reports back through ?etsy=…; show it here rather than
   // leaving the seller to read it out of the address bar.
@@ -174,6 +190,45 @@ export function EtsyPanel({
     setSettings(loadSettings(productId, catalogColors));
     setResult(null);
   }, [productId, catalogColors]);
+
+  // Template photos belong to the blank, so they reload with it.
+  useEffect(() => {
+    setTemplateError(null);
+    fetch(`/api/etsy/templates?productId=${encodeURIComponent(productId)}`)
+      .then((response) => response.json())
+      .then((body) => setTemplates(body.images ?? []))
+      .catch(() => setTemplates([]));
+  }, [productId]);
+
+  async function addTemplates(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setTemplateError(null);
+
+    const form = new FormData();
+    for (const file of Array.from(files)) form.append("images", file);
+
+    try {
+      const response = await fetch(
+        `/api/etsy/templates?productId=${encodeURIComponent(productId)}`,
+        { method: "POST", body: form },
+      );
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Could not save the images.");
+      setTemplates(body.images ?? []);
+    } catch (caught) {
+      setTemplateError(caught instanceof Error ? caught.message : "Unknown error.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function removeTemplate(name: string) {
+    const params = new URLSearchParams({ productId, file: name });
+    const response = await fetch(`/api/etsy/templates?${params}`, { method: "DELETE" });
+    const body = await response.json();
+    setTemplates(body.images ?? []);
+  }
 
   const update = useCallback(
     (patch: Partial<PublishSettings>) => {
@@ -222,6 +277,7 @@ export function EtsyPanel({
           quantity: Number(settings.quantity),
           whoMade: settings.whoMade,
           whenMade: settings.whenMade,
+          productId,
           variations: settings.variationsOn
             ? {
                 sizeLabel: settings.sizeLabel,
@@ -489,6 +545,48 @@ export function EtsyPanel({
         </>
       )}
 
+      <div className="field">
+        <label htmlFor="etsy-templates">Template photos</label>
+        <input
+          id="etsy-templates"
+          type="file"
+          accept="image/png,image/jpeg,image/gif"
+          multiple
+          disabled={uploading || templates.length >= 10}
+          onChange={(event) => {
+            void addTemplates(event.target.files);
+            event.target.value = "";
+          }}
+        />
+        {templates.length > 0 && (
+          <ul className="templates">
+            {templates.map((image, index) => (
+              <li key={image.name}>
+                <img
+                  src={`/api/etsy/templates?productId=${encodeURIComponent(productId)}&file=${encodeURIComponent(image.name)}`}
+                  alt=""
+                />
+                <span>
+                  <strong>
+                    {index + 1}. {image.name}
+                  </strong>
+                  {formatSize(image.size)}
+                </span>
+                <button type="button" className="linklike" onClick={() => removeTemplate(image.name)}>
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {templateError && <div className="alert error">{templateError}</div>}
+        <p className="hint">
+          Added to every listing for this blank — size chart, care card, colour chart. Uploaded in
+          the order shown, which is name order, so prefixing files 1-, 2-, 3- fixes the gallery.
+          Etsy allows 10 photos and shows the first as the search thumbnail.
+        </p>
+      </div>
+
       <p className="hint">
         If a print partner manufactures for you, Etsy expects &quot;Another company or person&quot;
         with that partner declared in your shop settings.
@@ -511,7 +609,8 @@ export function EtsyPanel({
       {result && (
         <>
           <div className="alert info" style={{ marginTop: "1rem" }}>
-            Draft created{result.variations ? ` with ${offeringCount} variations` : ""}.{" "}
+            Draft created{result.variations ? ` with ${offeringCount} variations` : ""}
+            {result.uploaded ? ` and ${result.uploaded} photos` : ""}.{" "}
             <a href={result.listing.url} target="_blank" rel="noreferrer">
               Open listing {result.listing.listingId} on Etsy
             </a>{" "}
@@ -522,6 +621,7 @@ export function EtsyPanel({
               The draft was created but the variations were not added: {result.variationError}
             </div>
           )}
+          {result.imageError && <div className="alert warn">{result.imageError}</div>}
         </>
       )}
     </div>

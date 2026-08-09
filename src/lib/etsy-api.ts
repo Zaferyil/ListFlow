@@ -448,3 +448,29 @@ export async function createDraftListing(
     url: created.url ?? `https://www.etsy.com/your/shops/me/tools/listings/${created.listing_id}`,
   };
 }
+
+/** Etsy allows ten photos on a listing. */
+export const MAX_LISTING_IMAGES = 10;
+
+/**
+ * Adds one photo to a listing. Rank is the position in the gallery, starting
+ * at 1 — Etsy shows rank 1 as the thumbnail buyers see in search.
+ */
+export async function uploadListingImage(
+  accessToken: string,
+  shopId: number,
+  listingId: number,
+  file: { name: string; type: string; bytes: Buffer },
+  rank: number,
+): Promise<void> {
+  const form = new FormData();
+  form.set("image", new Blob([new Uint8Array(file.bytes)], { type: file.type }), file.name);
+  form.set("rank", String(rank));
+
+  // No content-type header here on purpose: fetch has to set the multipart
+  // boundary itself.
+  await etsyFetch(`/shops/${shopId}/listings/${listingId}/images`, accessToken, {
+    method: "POST",
+    body: form,
+  });
+}

@@ -120,11 +120,21 @@ Taslak açıldıktan sonra varyasyon çağrısı başarısız olursa taslak **si
 
 Panelde kategori, işlem profili (processing profile), kargo profili, fiyat, adet, "who made" ve "when made" seçersiniz. Bu ayarlar **ürün bazında** tarayıcıda saklanır, her listingde tekrar girmezsiniz. Varsayılanlar: 24.99 USD, 999 adet, *I did*, *Made to order*.
 
+### Şablon görselleri
+
+Her listing'e giren sabit görseller (beden tablosu, yıkama talimatı, renk kartı) blank başına bir kez yüklenir; taslak oluşturulduktan sonra otomatik eklenir.
+
+- Paneldeki **Template photos** alanından seçin. PNG, JPEG, GIF; dosya başına en fazla 20 MB.
+- **İsim sırasına göre** yüklenir, o yüzden dosyaları `1-`, `2-`, `3-` diye numaralayın. Etsy ilk görseli aramada çıkan küçük resim olarak kullanıyor.
+- Etsy listing başına 10 görsele izin veriyor; 10'dan fazlası kabul edilmiyor.
+- Dosyalar `.data/templates/<blank-id>/` altında tutuluyor (gitignore'da). Dosya adları tarayıcıdan geldiği için yeniden kurgulanıyor — `../` içeren bir ad klasörün dışına çıkamaz.
+
+Görsel yükleme taslak oluştuktan sonra çalıştığı için, yükleme yarıda kalırsa taslak yine duruyor: panel kaç görselin gittiğini ve hatayı gösteriyor.
+
 Notlar:
 
 - Baskıyı bir print partner yapıyorsa Etsy "Another company or person" bekler ve partneri mağaza ayarlarında tanımlamanızı ister.
 - Açıklamadaki emoji, API ile açılan taslağı Etsy arayüzünde düzenlenemez hâle getiriyor (Etsy tarafında bilinen bir hata). Bu yüzden **gönderilen** metinden emoji temizlenir; sizin kopyaladığınız metin aynı kalır.
-- Görsel yüklenmez — mockup'ları Etsy'de eklersiniz.
 - Etsy her fiziksel listing'in bir **processing profile**'a bağlanmasını istiyor. Profil Etsy mağaza ayarlarınızda oluşturulur; panel mevcut profilleri okuyup seçtiriyor.
 - Şu an sadece Design ve Niche sekmelerinde çıkar; Google Sheet toplu üretimi hâlâ sheet'e yazar.
 
@@ -141,6 +151,7 @@ Notlar:
 | `GET /api/etsy/status` | Bağlantı durumu, mağaza ve kargo profilleri (`DELETE` bağlantıyı keser) |
 | `GET /api/etsy/taxonomy` | Etsy kategori ağacı (Clothing dalı, günlük cache) |
 | `POST /api/etsy/publish` | Listing'i taslak olarak mağazaya gönderir |
+| `GET/POST/DELETE /api/etsy/templates?productId=` | Blank'in şablon görselleri |
 
 `productId` verilmezse veya tanınmazsa ilk ürün (Comfort Colors 1717) kullanılır. `spreadsheetId` tam URL de kabul eder.
 
@@ -161,6 +172,7 @@ src/app/api/*         Route handler'lar
 src/app/page.tsx      UI (3 sekme)
 src/app/DropZone.tsx  Sürükle-bırak dosya alanı
 src/app/ListingCard.tsx  Sonuç kartı
+src/lib/etsy-templates.ts  Blank başına şablon görselleri (.data/templates/)
 src/app/EtsyPanel.tsx    Etsy'ye taslak gönderme paneli (4. adım)
 ```
 
