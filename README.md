@@ -105,13 +105,26 @@ Kurulum:
 
 Bağlantı `.data/etsy-tokens.json` içinde tutulur (gitignore'da). Access token 1 saat, refresh token 90 gün geçerli; süre dolunca otomatik yenilenir, 90 günden sonra tekrar bağlanmanız istenir.
 
-Panelde kategori, kargo profili, fiyat, adet, "who made" ve "when made" seçersiniz. Bu ayarlar **ürün bazında** tarayıcıda saklanır, her listingde tekrar girmezsiniz. Varsayılanlar: 24.99 USD, 999 adet, *I did*, *Made to order*.
+### Varyasyonlar
+
+**Add size and colour variations** kutusunu işaretlerseniz taslak, beden × renk kombinasyonlarıyla oluşturulur (Etsy'nin `updateListingInventory` ucu, taslak açıldıktan sonra ikinci bir çağrıyla).
+
+- **Sizes and prices** — satır başına `beden = fiyat`. Etsy fiyatın **tek bir varyasyona** bağlanmasına izin veriyor; burada o varyasyon beden. Yani 2XL'in her rengi aynı fiyat.
+- **Colours** — satır başına bir renk.
+- Listing fiyatı en ucuz bedene eşitlenir; Etsy bunu "from" fiyatı olarak gösterir.
+
+Renkler serbest metin olarak gönderiliyor (Etsy'nin custom variation slotları). Comfort Colors'ın "Blue Jean", "Pepper" gibi renkleri Etsy'nin sabit renk listesinde yok, beden dizileri de blank'e göre değişiyor — bu yüzden taksonominin hazır değer listeleri bu mağazaya uymuyor.
+
+Taslak açıldıktan sonra varyasyon çağrısı başarısız olursa taslak **silinmiyor**; panel taslağın linkini ve varyasyon hatasını birlikte gösteriyor, yoksa kimsenin haberi olmadan boşta bir taslak kalırdı.
+
+Panelde kategori, işlem profili (processing profile), kargo profili, fiyat, adet, "who made" ve "when made" seçersiniz. Bu ayarlar **ürün bazında** tarayıcıda saklanır, her listingde tekrar girmezsiniz. Varsayılanlar: 24.99 USD, 999 adet, *I did*, *Made to order*.
 
 Notlar:
 
 - Baskıyı bir print partner yapıyorsa Etsy "Another company or person" bekler ve partneri mağaza ayarlarında tanımlamanızı ister.
 - Açıklamadaki emoji, API ile açılan taslağı Etsy arayüzünde düzenlenemez hâle getiriyor (Etsy tarafında bilinen bir hata). Bu yüzden **gönderilen** metinden emoji temizlenir; sizin kopyaladığınız metin aynı kalır.
 - Görsel yüklenmez — mockup'ları Etsy'de eklersiniz.
+- Etsy her fiziksel listing'in bir **processing profile**'a bağlanmasını istiyor. Profil Etsy mağaza ayarlarınızda oluşturulur; panel mevcut profilleri okuyup seçtiriyor.
 - Şu an sadece Design ve Niche sekmelerinde çıkar; Google Sheet toplu üretimi hâlâ sheet'e yazar.
 
 ## API

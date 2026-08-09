@@ -230,6 +230,121 @@ export async function getProcessingProfiles(
 }
 
 /**
+ * Etsy's two custom variation slots. Print-on-demand colourways ("Blue Jean",
+ * "Pepper", "Sand") are not in Etsy's fixed colour list, and blank size runs
+ * vary by garment, so free text on the custom properties fits this shop where
+ * the taxonomy's own value lists would not.
+ * https://developer.etsy.com/documentation/tutorials/third-variation
+ */
+const SIZE_PROPERTY = 513;
+const COLOR_PROPERTY = 514;
+
+/** Etsy caps a single variation at 70 values. */
+export const MAX_VARIATION_VALUES = 70;
+
+export interface SizeVariation {
+  name: string;
+  price: number;
+}
+
+export interface VariationInput {
+  sizes: SizeVariation[];
+  colors: string[];
+  quantity: number;
+  readinessStateId: number;
+}
+
+interface InventoryProduct {
+  sku: string;
+  property_values: {
+    property_id: number;
+    property_name: string;
+    value_ids: number[];
+    values: string[];
+  }[];
+  offerings: {
+    price: number;
+    quantity: number;
+    is_enabled: boolean;
+    readiness_state_id: number;
+  }[];
+}
+
+/**
+ * Replaces a listing's inventory with one product per size/colour pair.
+ *
+ * Price hangs off size alone (price_on_property), which is what Etsy allows —
+ * one property drives price — and matches how these blanks are actually
+ * priced: the same colour costs more in 2XL.
+ */
+export async function updateListingInventory(
+  accessToken: string,
+  listingId: number,
+  input: VariationInput,
+): Promise<void> {
+  const sizes = input.sizes.filter((size) => size.name.trim() && size.price > 0);
+  const colors = input.colors.map((color) => color.trim()).filter(Boolean);
+
+  if (sizes.length === 0) {
+    throw new Error("Add at least one size before sending variations.");
+  }
+  if (sizes.length > MAX_VARIATION_VALUES || colors.length > MAX_VARIATION_VALUES) {
+    throw new Error(`Etsy allows at most ${MAX_VARIATION_VALUES} values per variation.`);
+  }
+
+  // No colours means a single-axis listing rather than an empty second axis.
+  const colorValues = colors.length > 0 ? colors : [null];
+  const products: InventoryProduct[] = [];
+
+  for (const size of sizes) {
+    for (const color of colorValues) {
+      const propertyValues = [
+        {
+          property_id: SIZE_PROPERTY,
+          property_name: "Size",
+          value_ids: [],
+          values: [size.name.trim()],
+        },
+      ];
+
+      if (color !== null) {
+        propertyValues.push({
+          property_id: COLOR_PROPERTY,
+          property_name: "Color",
+          value_ids: [],
+          values: [color],
+        });
+      }
+
+      products.push({
+        sku: "",
+        property_values: propertyValues,
+        offerings: [
+          {
+            price: size.price,
+            quantity: input.quantity,
+            is_enabled: true,
+            readiness_state_id: input.readinessStateId,
+          },
+        ],
+      });
+    }
+  }
+
+  await etsyFetch(`/listings/${listingId}/inventory`, accessToken, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      products,
+      price_on_property: [SIZE_PROPERTY],
+      quantity_on_property: [],
+      sku_on_property: [],
+      readiness_state_on_property: [],
+    }),
+  });
+}
+
+/**
  * Emoji in the description makes a draft created through the API uneditable in
  * Etsy's own listing editor — a long-standing bug on their side. The seller's
  * copy keeps whatever the model wrote; only what we send is stripped.

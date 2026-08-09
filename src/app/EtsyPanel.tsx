@@ -27,6 +27,12 @@ interface Category {
   path: string;
 }
 
+interface PublishResult {
+  listing: { url: string; listingId: number };
+  variations?: boolean;
+  variationError?: string;
+}
+
 /**
  * Publishing settings are per-blank — a youth tee and a hoodie sit in different
  * Etsy categories and often at different prices — and they persist locally so
@@ -40,6 +46,11 @@ interface PublishSettings {
   quantity: string;
   whoMade: "i_did" | "someone_else" | "collective";
   whenMade: string;
+  variationsOn: boolean;
+  /** One "size = price" per line, so a size run can be pasted or edited whole. */
+  sizesText: string;
+  /** One colour per line. */
+  colorsText: string;
 }
 
 const DEFAULTS: PublishSettings = {
@@ -53,7 +64,32 @@ const DEFAULTS: PublishSettings = {
   // when a third party manufactures.
   whoMade: "i_did",
   whenMade: "made_to_order",
+  variationsOn: false,
+  sizesText: "S = 24.99\nM = 24.99\nL = 24.99\nXL = 24.99\n2XL = 26.99\n3XL = 28.99",
+  colorsText: "",
 };
+
+/**
+ * "2XL = 26.99" per line. Etsy lets price vary on one property only, and for
+ * these blanks that property is size — the same colour costs more in 2XL.
+ */
+function parseSizes(text: string): { name: string; price: number }[] {
+  return text
+    .split("\n")
+    .map((line) => {
+      const [name, price] = line.split("=");
+      return { name: (name ?? "").trim(), price: Number((price ?? "").trim()) };
+    })
+    .filter((size) => size.name && size.price > 0);
+}
+
+function parseColors(text: string): string[] {
+  const colors = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return [...new Set(colors)];
+}
 
 function settingsKey(productId: string): string {
   return `listflow.etsy.${productId}`;
@@ -80,7 +116,7 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
   const [categories, setCategories] = useState<Category[]>([]);
   const [settings, setSettings] = useState<PublishSettings>(DEFAULTS);
   const [search, setSearch] = useState("");
-  const [result, setResult] = useState<{ url: string; listingId: number } | null>(null);
+  const [result, setResult] = useState<PublishResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [callbackNote, setCallbackNote] = useState<string | null>(null);
@@ -151,11 +187,14 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
           quantity: Number(settings.quantity),
           whoMade: settings.whoMade,
           whenMade: settings.whenMade,
+          variations: settings.variationsOn
+            ? { sizes: parseSizes(settings.sizesText), colors: parseColors(settings.colorsText) }
+            : undefined,
         }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? `Request failed (${response.status}).`);
-      setResult(body.listing);
+      setResult(body);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unknown error.");
     } finally {
@@ -205,11 +244,15 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
     ? categories.filter((entry) => entry.path.toLowerCase().includes(search.trim().toLowerCase()))
     : categories;
   const processingProfiles = status.processingProfiles ?? [];
+  const sizeCount = parseSizes(settings.sizesText).length;
+  const colorCount = parseColors(settings.colorsText).length;
+  const offeringCount = sizeCount * Math.max(colorCount, 1);
   const ready =
     listing !== null &&
     settings.taxonomyId !== null &&
     settings.readinessStateId !== null &&
-    Number(settings.price) > 0;
+    Number(settings.price) > 0 &&
+    (!settings.variationsOn || sizeCount > 0);
 
   return (
     <div className="card">
@@ -336,6 +379,51 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
         </div>
       </div>
 
+      <div className="field">
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={settings.variationsOn}
+            onChange={(event) => update({ variationsOn: event.target.checked })}
+          />
+          Add size and colour variations
+        </label>
+      </div>
+
+      {settings.variationsOn && (
+        <>
+          <div className="row">
+            <div className="field">
+              <label htmlFor="etsy-sizes">Sizes and prices</label>
+              <textarea
+                id="etsy-sizes"
+                rows={7}
+                value={settings.sizesText}
+                onChange={(event) => update({ sizesText: event.target.value })}
+                placeholder={"S = 24.99\nM = 24.99\n2XL = 26.99"}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="etsy-colors">Colours</label>
+              <textarea
+                id="etsy-colors"
+                rows={7}
+                value={settings.colorsText}
+                onChange={(event) => update({ colorsText: event.target.value })}
+                placeholder={"Black\nWhite\nSand\nBlue Jean"}
+              />
+            </div>
+          </div>
+          <p className="hint">
+            One per line; sizes take <code>name = price</code>. Etsy lets price vary on one
+            variation only, so it follows size — every colour of a 2XL costs the same.{" "}
+            {sizeCount > 0
+              ? `${offeringCount} combination${offeringCount === 1 ? "" : "s"} — ${sizeCount} size${sizeCount === 1 ? "" : "s"}${colorCount > 0 ? ` × ${colorCount} colour${colorCount === 1 ? "" : "s"}` : ", no colours"}.`
+              : "No sizes recognised yet."}
+          </p>
+        </>
+      )}
+
       <p className="hint">
         If a print partner manufactures for you, Etsy expects &quot;Another company or person&quot;
         with that partner declared in your shop settings.
@@ -356,13 +444,20 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
       )}
       {error && <div className="alert error" style={{ marginTop: "1rem" }}>{error}</div>}
       {result && (
-        <div className="alert info" style={{ marginTop: "1rem" }}>
-          Draft created.{" "}
-          <a href={result.url} target="_blank" rel="noreferrer">
-            Open listing {result.listingId} on Etsy
-          </a>{" "}
-          — add your mockup images there, then publish.
-        </div>
+        <>
+          <div className="alert info" style={{ marginTop: "1rem" }}>
+            Draft created{result.variations ? ` with ${offeringCount} variations` : ""}.{" "}
+            <a href={result.listing.url} target="_blank" rel="noreferrer">
+              Open listing {result.listing.listingId} on Etsy
+            </a>{" "}
+            — add your mockup images there, then publish.
+          </div>
+          {result.variationError && (
+            <div className="alert warn">
+              The draft was created but the variations were not added: {result.variationError}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
