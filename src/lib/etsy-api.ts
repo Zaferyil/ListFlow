@@ -23,12 +23,28 @@ export function keystring(): string {
   return value;
 }
 
+/**
+ * Since 9 February 2026 Etsy rejects API calls whose x-api-key is the keystring
+ * alone; it has to carry the shared secret too. OAuth token requests are the
+ * exception — those still take the bare keystring as client_id.
+ * https://developer.etsy.com/documentation/essentials/authentication/
+ */
+export function apiKeyHeader(): string {
+  const secret = process.env.ETSY_SHARED_SECRET;
+  if (!secret) {
+    throw new Error(
+      "ETSY_SHARED_SECRET is not set. Etsy requires it alongside the keystring — add it to .env.local.",
+    );
+  }
+  return `${keystring()}:${secret}`;
+}
+
 export function redirectUri(): string {
   return process.env.ETSY_REDIRECT_URI ?? "http://localhost:3000/api/etsy/callback";
 }
 
 export function isEtsyConfigured(): boolean {
-  return Boolean(process.env.ETSY_KEYSTRING);
+  return Boolean(process.env.ETSY_KEYSTRING && process.env.ETSY_SHARED_SECRET);
 }
 
 /** PKCE verifier: 43-128 chars from the unreserved set Etsy specifies. */
@@ -124,7 +140,7 @@ export async function etsyFetch<T>(
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
-      "x-api-key": keystring(),
+      "x-api-key": apiKeyHeader(),
       authorization: `Bearer ${accessToken}`,
       ...init.headers,
     },

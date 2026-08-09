@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isEtsyConfigured, keystring } from "@/lib/etsy-api";
+import { apiKeyHeader, isEtsyConfigured } from "@/lib/etsy-api";
 
 export const runtime = "nodejs";
 // The seller taxonomy is effectively static; caching it keeps the picker snappy
@@ -28,13 +28,13 @@ function flatten(nodes: TaxonomyNode[], trail: string[] = []): { id: number; pat
  */
 export async function GET() {
   if (!isEtsyConfigured()) {
-    return NextResponse.json({ error: "ETSY_KEYSTRING is not set." }, { status: 501 });
+    return NextResponse.json({ error: "ETSY_KEYSTRING / ETSY_SHARED_SECRET are not set." }, { status: 501 });
   }
 
   try {
     // Public endpoint: the app key is enough, no seller authorization needed.
     const response = await fetch("https://openapi.etsy.com/v3/application/seller-taxonomy/nodes", {
-      headers: { "x-api-key": keystring() },
+      headers: { "x-api-key": apiKeyHeader() },
       next: { revalidate },
     });
 

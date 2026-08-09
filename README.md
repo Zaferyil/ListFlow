@@ -91,12 +91,13 @@ Listing üretildikten sonra **4. adım** çıkar: sonucu doğrudan mağazanıza 
 
 Kurulum:
 
-1. https://www.etsy.com/developers/your-apps → uygulamanızın **Keystring** değerini alın.
+1. https://www.etsy.com/developers/your-apps → uygulamanızın **Keystring** ve **Shared Secret** değerlerini alın. Etsy 9 Şubat 2026'dan beri `x-api-key` başlığında ikisini birlikte (`keystring:shared_secret`) istiyor, bu yüzden shared secret de gerekiyor.
 2. Aynı sayfada **Callback URL** olarak `http://localhost:3000/api/etsy/callback` ekleyin (deploy ederseniz kendi alan adınızla aynısını ekleyin).
 3. `.env.local` içine yazın — anahtarı hiçbir yere yapıştırmayın, sadece bu dosyaya:
 
    ```
    ETSY_KEYSTRING=...
+   ETSY_SHARED_SECRET=...
    ETSY_REDIRECT_URI=http://localhost:3000/api/etsy/callback
    ```
 
