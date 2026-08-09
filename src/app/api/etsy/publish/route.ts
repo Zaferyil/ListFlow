@@ -13,6 +13,8 @@ const bodySchema = z.object({
   materials: z.array(z.string().trim().min(1)).max(13),
   taxonomyId: z.number().int().positive(),
   shippingProfileId: z.number().int().positive().optional(),
+  // Etsy requires a processing profile on every physical listing.
+  readinessStateId: z.number().int().positive(),
   price: z.number().positive(),
   quantity: z.number().int().positive(),
   whoMade: z.enum(["i_did", "someone_else", "collective"]),

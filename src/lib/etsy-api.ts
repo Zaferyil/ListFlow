@@ -191,6 +191,44 @@ export async function getShippingProfiles(
   }));
 }
 
+export interface ProcessingProfile {
+  id: number;
+  label: string;
+  readinessState: string;
+}
+
+/**
+ * Etsy now requires every physical listing to be linked to a processing profile
+ * ("readiness state"), which carries the shop's processing time. They are
+ * created in the shop's settings; this only reads them.
+ * https://developers.etsy.com/documentation/tutorials/migration
+ */
+export async function getProcessingProfiles(
+  accessToken: string,
+  shopId: number,
+): Promise<ProcessingProfile[]> {
+  const response = await etsyFetch<{
+    results: {
+      readiness_state_id: number;
+      readiness_state: string;
+      min_processing_time?: number;
+      max_processing_time?: number;
+      processing_time_unit?: string;
+    }[];
+  }>(`/shops/${shopId}/readiness-state-definitions`, accessToken);
+
+  return response.results.map((entry) => {
+    const state = entry.readiness_state === "ready_to_ship" ? "Ready to ship" : "Made to order";
+    const unit = entry.processing_time_unit ?? "days";
+    const span =
+      entry.min_processing_time && entry.max_processing_time
+        ? ` — ${entry.min_processing_time}-${entry.max_processing_time} ${unit}`
+        : "";
+
+    return { id: entry.readiness_state_id, label: `${state}${span}`, readinessState: entry.readiness_state };
+  });
+}
+
 /**
  * Emoji in the description makes a draft created through the API uneditable in
  * Etsy's own listing editor — a long-standing bug on their side. The seller's
@@ -212,6 +250,7 @@ export interface DraftListingInput {
   whenMade: string;
   taxonomyId: number;
   shippingProfileId?: number;
+  readinessStateId: number;
   tags: string[];
   materials: string[];
 }
@@ -238,6 +277,7 @@ export async function createDraftListing(
     who_made: input.whoMade,
     when_made: input.whenMade,
     taxonomy_id: input.taxonomyId,
+    readiness_state_id: input.readinessStateId,
     tags: input.tags,
     materials: input.materials,
     // Physical goods; "download" would be a digital listing.
@@ -251,7 +291,8 @@ export async function createDraftListing(
   }
 
   const created = await etsyFetch<{ listing_id: number; url?: string }>(
-    `/shops/${shopId}/listings`,
+    // legacy=false selects the listing flow that accepts readiness_state_id.
+    `/shops/${shopId}/listings?legacy=false`,
     accessToken,
     {
       method: "POST",

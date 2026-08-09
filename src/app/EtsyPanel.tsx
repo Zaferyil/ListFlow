@@ -8,11 +8,17 @@ interface ShippingProfile {
   title: string;
 }
 
+interface ProcessingProfile {
+  id: number;
+  label: string;
+}
+
 interface Status {
   configured: boolean;
   connected: boolean;
   shop?: { shopId: number; shopName: string };
   shippingProfiles?: ShippingProfile[];
+  processingProfiles?: ProcessingProfile[];
   error?: string;
 }
 
@@ -29,6 +35,7 @@ interface Category {
 interface PublishSettings {
   taxonomyId: number | null;
   shippingProfileId: number | null;
+  readinessStateId: number | null;
   price: string;
   quantity: string;
   whoMade: "i_did" | "someone_else" | "collective";
@@ -38,6 +45,7 @@ interface PublishSettings {
 const DEFAULTS: PublishSettings = {
   taxonomyId: null,
   shippingProfileId: null,
+  readinessStateId: null,
   price: "24.99",
   quantity: "999",
   // Print-on-demand: the seller designs it, a partner prints it. See the note
@@ -138,6 +146,7 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
           materials: listing.materials,
           taxonomyId: settings.taxonomyId,
           shippingProfileId: settings.shippingProfileId ?? undefined,
+          readinessStateId: settings.readinessStateId,
           price: Number(settings.price),
           quantity: Number(settings.quantity),
           whoMade: settings.whoMade,
@@ -195,7 +204,12 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
   const visibleCategories = search.trim()
     ? categories.filter((entry) => entry.path.toLowerCase().includes(search.trim().toLowerCase()))
     : categories;
-  const ready = listing !== null && settings.taxonomyId !== null && Number(settings.price) > 0;
+  const processingProfiles = status.processingProfiles ?? [];
+  const ready =
+    listing !== null &&
+    settings.taxonomyId !== null &&
+    settings.readinessStateId !== null &&
+    Number(settings.price) > 0;
 
   return (
     <div className="card">
@@ -250,6 +264,28 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="field">
+        <label htmlFor="etsy-processing">Processing profile</label>
+        <select
+          id="etsy-processing"
+          value={settings.readinessStateId ?? ""}
+          onChange={(event) => update({ readinessStateId: Number(event.target.value) || null })}
+        >
+          <option value="">Choose a processing profile…</option>
+          {processingProfiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.label}
+            </option>
+          ))}
+        </select>
+        {processingProfiles.length === 0 && (
+          <p className="hint">
+            Etsy requires one on every physical listing. Create a processing profile in your Etsy
+            shop settings, then reload this page.
+          </p>
+        )}
       </div>
 
       <div className="row">
@@ -314,7 +350,7 @@ export function EtsyPanel({ listing, productId }: { listing: Listing | null; pro
       {!ready && (
         <p className="hint">
           {listing
-            ? "Pick a category and a price to enable sending."
+            ? "Pick a category, a processing profile and a price to enable sending."
             : "Generate a listing in step 3 first — your settings above are saved."}
         </p>
       )}

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { getShippingProfiles, getShop, isEtsyConfigured } from "@/lib/etsy-api";
+import {
+  getProcessingProfiles,
+  getShippingProfiles,
+  getShop,
+  isEtsyConfigured,
+} from "@/lib/etsy-api";
 import { disconnect, getAccessToken, isConnected } from "@/lib/etsy-tokens";
 
 export const runtime = "nodejs";
@@ -16,11 +21,17 @@ export async function GET() {
   try {
     const accessToken = await getAccessToken();
     const shop = await getShop(accessToken);
+    const [shippingProfiles, processingProfiles] = await Promise.all([
+      getShippingProfiles(accessToken, shop.shopId),
+      getProcessingProfiles(accessToken, shop.shopId),
+    ]);
+
     return NextResponse.json({
       configured: true,
       connected: true,
       shop,
-      shippingProfiles: await getShippingProfiles(accessToken, shop.shopId),
+      shippingProfiles,
+      processingProfiles,
     });
   } catch (error) {
     return NextResponse.json({
