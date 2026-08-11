@@ -61,6 +61,14 @@ npm run dev
 
 http://localhost:3000
 
+### Şifre koruması
+
+`.env.local` içine `APP_PASSWORD=...` yazarsanız uygulama tek bir şifreyle korunur: bütün sayfalar ve API uçları `/login` arkasına geçer, giriş 30 gün geçerli bir çerezde tutulur.
+
+Boş bırakılırsa yerelde şifresiz açılır. **Production build'de zorunlu** — şifre tanımlanmamış bir deploy hiçbir şey servis etmez, böylece kazara korumasız bir kopya internete çıkamaz.
+
+Tek satıcı olduğu için hesap/kullanıcı yok. Buradaki amaç, public bir URL'i bulan birinin OpenAI kredinizi harcamasını ve Etsy mağazanıza taslak atmasını engellemek.
+
 ### Google Sheets (opsiyonel)
 
 Sadece sheet sekmesi için gerekli; tasarım ve tek-niş sekmeleri onsuz çalışır.
