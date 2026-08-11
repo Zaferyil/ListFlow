@@ -93,6 +93,30 @@ Başlık satırı hiç tanınmazsa sütunlar soldan sağa varsayılır (A niş, 
 
 Üretimi başarısız olan satır `New` kalır, sonraki çalıştırmada tekrar denenir. **Max rows per run** sınırı aşılırsa kalan satır sayısı bildirilir; butona tekrar basarak devam edersiniz.
 
+## Netlify'a deploy (kullanıcı başına bir site)
+
+Uygulama tek satıcı için tasarlandı. Birden fazla kişi kullanacaksa **her kişi kendi Netlify sitesini** aynı depodan kurar ve kendi environment variables'ını girer. Kod ortak, veriler ayrı.
+
+Her sitede tanımlanacaklar:
+
+| Değişken | Değer |
+|---|---|
+| `APP_PASSWORD` | o kişinin şifresi (production'da zorunlu) |
+| `OPENAI_API_KEY` | o kişinin OpenAI anahtarı — fatura kime gidecekse |
+| `ETSY_KEYSTRING` | o kişinin Etsy uygulamasının keystring'i |
+| `ETSY_SHARED_SECRET` | aynı uygulamanın shared secret'ı |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY` | sheet sekmesi kullanılacaksa |
+
+`ETSY_REDIRECT_URI` **girilmez**: kod, isteğin geldiği adresten (`x-forwarded-host`) türetiyor, böylece her site kendi adresini kullanır. Ama her kişi kendi Etsy uygulamasına kendi adresini **Callback URL** olarak eklemek zorunda:
+
+```
+https://<site-adi>.netlify.app/api/etsy/callback
+```
+
+Etsy token'ları ve şablon görselleri **Netlify Blobs**'a yazılır (`src/lib/storage.ts`). Yerelde çalışırken aynı veriler `.data/` klasöründe kalır — yani `git pull` sonrası kendi bilgisayarınızdaki kurulum bozulmaz.
+
+**Süre limiti.** Netlify'ın ücretsiz planında fonksiyonlar 10 saniyede kesiliyor. Bu yüzden Google Sheet toplu üretimi tek istekte değil, **satır satır** çalışıyor: tarayıcı sırayla ister, her istek bir listing üretir. Yan faydası, sonuçların tek tek görünmesi ve bir satırın hatasının diğerlerini durdurmaması.
+
 ## Etsy'ye taslak gönderme (opsiyonel)
 
 Listing üretildikten sonra **4. adım** çıkar: sonucu doğrudan mağazanıza **taslak (draft)** olarak gönderir. Taslak yayında değildir, listeleme ücreti kesilmez — mockup görsellerini Etsy'de ekleyip kendiniz yayınlarsınız.

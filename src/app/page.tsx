@@ -311,32 +311,67 @@ function SheetTab({ productId }: TabProps) {
     }
   }
 
+  /**
+   * Walks the sheet a row at a time.
+   *
+   * The server used to generate the whole batch in one request, which no
+   * serverless host will sit through — Netlify's free plan cuts a function off
+   * at ten seconds and one listing already takes six to eight. Asking row by
+   * row also means results appear as they land instead of after a long
+   * silence.
+   */
   async function generate() {
     setLoading(true);
     setError(null);
     setWriteInfo(null);
-    try {
-      const response = await fetch("/api/sheets", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ spreadsheetId, sheetName, limit, writeBack, productId }),
-      });
-      if (!response.ok) throw new Error(await errorFrom(response));
-      const body = await response.json();
-      setRows(body.results as BatchRow[]);
-      setLayout(body.layout as LayoutInfo);
-      setPendingCount(null);
+    setRows([]);
+    setPendingCount(null);
 
-      if (body.writeError) {
-        setWriteInfo(`Could not write to the sheet: ${body.writeError}`);
-      } else if (writeBack) {
-        const remaining = body.remaining as number;
-        setWriteInfo(
-          `Wrote ${body.writtenRows} rows and marked them Done.` +
-            (remaining > 0 ? ` ${remaining} still marked New — run again to continue.` : ""),
-        );
-      } else {
+    const seen = new Set<number>();
+    let failures = 0;
+
+    try {
+      for (let done = 0; done < limit; done += 1) {
+        const response = await fetch("/api/sheets", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ spreadsheetId, sheetName, limit: 1, writeBack, productId }),
+        });
+
+        // 404 is "nothing left marked New", which is the normal way to finish.
+        if (response.status === 404 && done > 0) break;
+        if (!response.ok) throw new Error(await errorFrom(response));
+
+        const body = await response.json();
+        const batch = body.results as BatchRow[];
+        setLayout(body.layout as LayoutInfo);
+
+        // A dry run leaves rows New, and a failed row keeps its status too, so
+        // the same row would come back forever. Stopping on a repeat is what
+        // makes the loop terminate in both cases.
+        if (batch.some((entry) => seen.has(entry.row))) break;
+        batch.forEach((entry) => seen.add(entry.row));
+
+        setRows((current) => [...current, ...batch]);
+
+        if (body.writeError) {
+          setWriteInfo(`Could not write to the sheet: ${body.writeError}`);
+          break;
+        }
+
+        failures += batch.filter((entry) => entry.error).length;
+        if (failures >= 2) {
+          setWriteInfo("Stopped after two rows failed — fix those, then run again.");
+          break;
+        }
+
+        if ((body.remaining as number) <= 0) break;
+      }
+
+      if (!writeBack) {
         setWriteInfo("Dry run — the sheet was not touched.");
+      } else if (seen.size > 0) {
+        setWriteInfo(`Wrote ${seen.size} row${seen.size === 1 ? "" : "s"} and marked them Done.`);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unknown error.");
@@ -408,7 +443,7 @@ function SheetTab({ productId }: TabProps) {
               Check sheet
             </button>
             <button className="primary" onClick={generate} disabled={!spreadsheetId || loading}>
-              {loading ? "Working…" : "Generate New rows"}
+              {loading ? `Working… ${rows.length} done` : "Generate New rows"}
             </button>
           </div>
         </div>

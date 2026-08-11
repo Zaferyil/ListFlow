@@ -1,15 +1,9 @@
-import { mkdir, readFile, readdir, rm, writeFile } from "fs/promises";
-import { join } from "path";
+import { listKeys, readBytes, readJson, remove, writeBytes, writeJson } from "./storage";
 
 /**
  * Template photos — size chart, care card, colour chart — that go on every
- * listing for a given blank.
- *
- * They live on disk beside the Etsy tokens, for the same reason and with the
- * same caveat: right for one seller on their own machine, wrong for a
- * serverless host where each invocation starts with an empty filesystem.
+ * listing for a given blank. See storage.ts for where the bytes land.
  */
-const TEMPLATE_ROOT = join(process.cwd(), ".data", "templates");
 
 /** Etsy accepts these; anything else is rejected at upload time. */
 const ALLOWED_TYPES: Record<string, string> = {
@@ -26,7 +20,7 @@ export interface TemplateImage {
 
 /**
  * Names come from the browser, so they are rebuilt from scratch rather than
- * trusted — a name like "../../etsy-tokens.json" must not reach join().
+ * trusted — a name like "../../etsy-tokens.json" must not reach a key.
  */
 function safeName(name: string): string {
   const cleaned = name
@@ -53,39 +47,29 @@ export function contentTypeFor(name: string): string {
   return type;
 }
 
-function folderFor(productId: string): string {
-  return join(TEMPLATE_ROOT, safeName(productId));
+function prefixFor(productId: string): string {
+  return `templates/${safeName(productId)}`;
+}
+
+function keyFor(productId: string, name: string): string {
+  return `${prefixFor(productId)}/${safeName(name)}`;
 }
 
 /**
- * The gallery order, kept beside the images. It is a dotfile with a .json
- * extension, so listTemplates — which only accepts image extensions — never
- * mistakes it for a photo.
+ * The gallery order, kept beside the images under a name the image-only
+ * listing filter skips.
  */
-const ORDER_FILE = ".order.json";
-
-async function readOrder(productId: string): Promise<string[]> {
-  try {
-    const raw = await readFile(join(folderFor(productId), ORDER_FILE), "utf8");
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((name): name is string => typeof name === "string") : [];
-  } catch {
-    return [];
-  }
+function orderKey(productId: string): string {
+  return `${prefixFor(productId)}/.order.json`;
 }
 
 /**
- * Stores the order the seller arranged. Names not on disk are dropped and
+ * Stores the order the seller arranged. Names not in storage are dropped and
  * files missing from the list keep their place at the end, so a stale order
  * from a deleted photo cannot hide a real one.
  */
 export async function setOrder(productId: string, names: string[]): Promise<TemplateImage[]> {
-  const folder = folderFor(productId);
-  await mkdir(folder, { recursive: true });
-  await writeFile(
-    join(folder, ORDER_FILE),
-    JSON.stringify(names.map(safeName), null, 2),
-  );
+  await writeJson(orderKey(productId), names.map(safeName));
   return listTemplates(productId);
 }
 
@@ -94,30 +78,28 @@ export async function setOrder(productId: string, names: string[]): Promise<Temp
  * not yet ordered — a photo added since — follows in name order.
  */
 export async function listTemplates(productId: string): Promise<TemplateImage[]> {
-  try {
-    const folder = folderFor(productId);
-    const present = (await readdir(folder)).filter((name) => extensionOf(name) in ALLOWED_TYPES);
-    const order = await readOrder(productId);
+  const present = (await listKeys(prefixFor(productId))).filter(
+    (name) => extensionOf(name) in ALLOWED_TYPES,
+  );
+  const order = (await readJson<string[]>(orderKey(productId))) ?? [];
 
-    const ordered = order.filter((name) => present.includes(name));
-    const rest = present
-      .filter((name) => !ordered.includes(name))
-      .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
-    const names = [...ordered, ...rest];
+  const ordered = order.filter((name) => present.includes(name));
+  const rest = present
+    .filter((name) => !ordered.includes(name))
+    .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
 
-    return await Promise.all(
-      names.map(async (name) => ({
-        name,
-        size: (await readFile(join(folder, name))).byteLength,
-      })),
-    );
-  } catch {
-    return [];
-  }
+  return Promise.all(
+    [...ordered, ...rest].map(async (name) => ({
+      name,
+      size: (await readBytes(keyFor(productId, name)))?.byteLength ?? 0,
+    })),
+  );
 }
 
 export async function readTemplate(productId: string, name: string): Promise<Buffer> {
-  return readFile(join(folderFor(productId), safeName(name)));
+  const bytes = await readBytes(keyFor(productId, name));
+  if (!bytes) throw new Error("No such image.");
+  return bytes;
 }
 
 export async function saveTemplate(
@@ -128,13 +110,10 @@ export async function saveTemplate(
   const safe = safeName(name);
   contentTypeFor(safe);
 
-  const folder = folderFor(productId);
-  await mkdir(folder, { recursive: true });
-  await writeFile(join(folder, safe), bytes);
-
+  await writeBytes(keyFor(productId, safe), bytes);
   return { name: safe, size: bytes.byteLength };
 }
 
 export async function deleteTemplate(productId: string, name: string): Promise<void> {
-  await rm(join(folderFor(productId), safeName(name)), { force: true });
+  await remove(keyFor(productId, name));
 }
