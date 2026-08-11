@@ -14,10 +14,18 @@ import {
 } from "@/lib/sheets";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
-/** How many listings to generate in parallel — keeps us inside API rate limits. */
-const CONCURRENCY = 3;
+/**
+ * How many listings one request generates.
+ *
+ * The browser calls this endpoint repeatedly until the sheet is drained, which
+ * keeps every request well inside a serverless function's time limit —
+ * Netlify's free plan cuts a function off at ten seconds, and a five-row batch
+ * takes closer to forty. It also means progress appears row by row instead of
+ * after a long silence, and a row that fails does not take the batch with it.
+ */
+const BATCH_SIZE = 1;
 
 /** The detected column mapping, as letters, so the UI can show what it found. */
 function describeLayout(layout: SheetLayout) {
@@ -66,7 +74,8 @@ const generateSchema = z.object({
   spreadsheetId: z.string().trim().min(1).transform(extractSpreadsheetId),
   sheetName: z.string().trim().min(1).default(DEFAULT_SHEET_NAME),
   productId: z.string().trim().optional(),
-  limit: z.number().int().min(1).max(50).default(10),
+  /** Rows per request. Kept small so a serverless run cannot time out. */
+  limit: z.number().int().min(1).max(50).default(BATCH_SIZE),
   /** Off runs a dry pass: listings come back, the sheet is left untouched. */
   writeBack: z.boolean().default(true),
 });
@@ -109,34 +118,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const results: BatchResult[] = new Array(pending.length);
-    let cursor = 0;
-
-    // A shared cursor gives us a fixed-size worker pool without pulling in a
-    // dependency: each worker takes the next index until the list is drained.
-    async function worker() {
-      while (cursor < pending.length) {
-        const index = cursor++;
-        const entry = pending[index];
+    const results: BatchResult[] = await Promise.all(
+      pending.map(async (entry) => {
         try {
           const listing = await generateFromNiche(entry.niche, { productId });
-          results[index] = {
+          return {
             row: entry.row,
             niche: entry.niche,
             listing,
             warnings: inspectListing(listing, requiredKeywordsFor(productId)),
           };
         } catch (error) {
-          results[index] = {
+          return {
             row: entry.row,
             niche: entry.niche,
             error: error instanceof Error ? error.message : "Generation failed.",
           };
         }
-      }
-    }
-
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pending.length) }, () => worker()));
+      }),
+    );
 
     let writtenRows = 0;
     let writeError: string | undefined;

@@ -1,35 +1,29 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import { dirname, join } from "path";
 import { refreshTokens, type TokenSet } from "./etsy-api";
+import { readJson, writeJson } from "./storage";
 
 /**
  * Where the Etsy connection is kept between requests.
  *
- * A file under .data/ is right for running this on your own machine: one
- * seller, one shop, survives restarts, and never leaves the disk. It does NOT
- * survive on a serverless host — Vercel gives each invocation a fresh, empty
- * filesystem, so a deploy there needs this swapped for a real store (Vercel KV
- * or similar). Everything else talks to load/save, so that swap is local.
+ * One seller, one shop, one stored token set — see storage.ts for where the
+ * bytes actually land, which differs between a local run and Netlify.
  */
-const TOKEN_FILE = join(process.cwd(), ".data", "etsy-tokens.json");
+const TOKEN_KEY = "etsy-tokens.json";
 
+/**
+ * A process-local cache. It saves a read per request, and is only ever
+ * populated from storage, so a cold start simply reads again.
+ */
 let cached: TokenSet | null = null;
 
 async function load(): Promise<TokenSet | null> {
   if (cached) return cached;
-  try {
-    cached = JSON.parse(await readFile(TOKEN_FILE, "utf8")) as TokenSet;
-    return cached;
-  } catch {
-    // No file yet, or unreadable — treat both as "not connected".
-    return null;
-  }
+  cached = await readJson<TokenSet>(TOKEN_KEY);
+  return cached;
 }
 
 async function save(tokens: TokenSet): Promise<void> {
   cached = tokens;
-  await mkdir(dirname(TOKEN_FILE), { recursive: true });
-  await writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2), { mode: 0o600 });
+  await writeJson(TOKEN_KEY, tokens);
 }
 
 export async function storeTokens(tokens: TokenSet): Promise<void> {
@@ -37,13 +31,13 @@ export async function storeTokens(tokens: TokenSet): Promise<void> {
 }
 
 export async function isConnected(): Promise<boolean> {
-  // A blank refresh token is what disconnect leaves behind, so the file
-  // existing is not by itself a connection.
+  // A blank refresh token is what disconnect leaves behind, so a stored value
+  // is not by itself a connection.
   return Boolean((await load())?.refreshToken);
 }
 
 export async function disconnect(): Promise<void> {
-  await save({ accessToken: "", refreshToken: "", expiresAt: 0 }).catch(() => undefined);
+  await save({ accessToken: "", refreshToken: "", expiresAt: 0 });
 }
 
 /**

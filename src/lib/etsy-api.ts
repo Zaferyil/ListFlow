@@ -39,8 +39,32 @@ export function apiKeyHeader(): string {
   return `${keystring()}:${secret}`;
 }
 
-export function redirectUri(): string {
-  return process.env.ETSY_REDIRECT_URI ?? "http://localhost:3000/api/etsy/callback";
+/**
+ * Where Etsy sends the seller back. Derived from the address the request came
+ * in on, so the same build serves several Netlify sites — each seller runs
+ * their own site with their own Etsy app — without a per-site variable. Etsy
+ * still matches it exactly, so this address has to be registered as a callback
+ * URL on that seller's Etsy app.
+ */
+export function redirectUri(origin?: string): string {
+  if (process.env.ETSY_REDIRECT_URI) return process.env.ETSY_REDIRECT_URI;
+  return `${origin ?? "http://localhost:3000"}/api/etsy/callback`;
+}
+
+/**
+ * The address the browser actually used.
+ *
+ * `request.url` is the server's own view of it, which behind Netlify's proxy is
+ * an internal address — not something Etsy would accept as a callback. The
+ * forwarded headers carry the public one.
+ */
+export function originOf(request: Request): string {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (!host) return new URL(request.url).origin;
+
+  const proto =
+    request.headers.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
 }
 
 export function isEtsyConfigured(): boolean {
@@ -56,11 +80,11 @@ export function codeChallengeFor(verifier: string): string {
   return createHash("sha256").update(verifier).digest("base64url");
 }
 
-export function authorizeUrl(state: string, verifier: string): string {
+export function authorizeUrl(state: string, verifier: string, origin?: string): string {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: keystring(),
-    redirect_uri: redirectUri(),
+    redirect_uri: redirectUri(origin),
     scope: SCOPES.join(" "),
     state,
     code_challenge: codeChallengeFor(verifier),
@@ -113,11 +137,12 @@ async function requestToken(body: Record<string, string>): Promise<TokenSet> {
   };
 }
 
-export function exchangeCode(code: string, verifier: string): Promise<TokenSet> {
+export function exchangeCode(code: string, verifier: string, origin?: string): Promise<TokenSet> {
   return requestToken({
     grant_type: "authorization_code",
     client_id: keystring(),
-    redirect_uri: redirectUri(),
+    // Must be byte-identical to the one sent at authorize time.
+    redirect_uri: redirectUri(origin),
     code,
     code_verifier: verifier,
   });
