@@ -7,7 +7,19 @@ import { FOR_ETSY, prepareForUpload } from "./shrink";
 
 interface TemplateReply {
   images?: TemplateImage[];
+  /** What this request wrote, which the listing may not yet reflect. */
+  saved?: TemplateImage[];
   error?: string;
+}
+
+/** How many template photos a blank may keep. All of them go on the listing. */
+const MAX_TEMPLATES = 14;
+
+/** Keeps the arranged order, adding anything the listing has not caught up
+ *  with — a photo written a moment ago is not always in it yet. */
+function merged(listed: TemplateImage[], saved: TemplateImage[]): TemplateImage[] {
+  const known = new Set(listed.map((image) => image.name));
+  return [...listed, ...saved.filter((image) => !known.has(image.name))];
 }
 
 /**
@@ -248,7 +260,7 @@ export function EtsyPanel({
         }
         // Applied as each one lands, so a failure halfway still leaves the
         // photos that did upload on screen.
-        setTemplates(body?.images ?? []);
+        setTemplates(merged(body?.images ?? [], body?.saved ?? []));
       }
     } catch (caught) {
       setTemplateError(caught instanceof Error ? caught.message : "Unknown error.");
@@ -612,16 +624,16 @@ export function EtsyPanel({
           label={
             uploading
               ? "Uploading…"
-              : templates.length >= 10
-                ? "Ten photos already added"
+              : templates.length >= MAX_TEMPLATES
+                ? `${MAX_TEMPLATES} photos already added`
                 : "Drop your template photos here"
           }
           hint={
-            templates.length >= 10
-              ? "Remove one to add another — Etsy allows ten per listing."
-              : `or click to browse — PNG, JPEG, GIF · ${10 - templates.length} slot${10 - templates.length === 1 ? "" : "s"} left`
+            templates.length >= MAX_TEMPLATES
+              ? `Remove one to add another — this blank keeps ${MAX_TEMPLATES}.`
+              : `or click to browse — PNG, JPEG, GIF · ${MAX_TEMPLATES - templates.length} slot${MAX_TEMPLATES - templates.length === 1 ? "" : "s"} left`
           }
-          disabled={uploading || templates.length >= 10}
+          disabled={uploading || templates.length >= MAX_TEMPLATES}
           onFiles={(files) => void addTemplates(files)}
         />
         {templates.length > 0 && (
@@ -727,7 +739,7 @@ export function EtsyPanel({
         <p className="hint">
           Added to every listing for this blank — size chart, care card, colour chart. Uploaded top
           to bottom; drag a row to rearrange it. Click rows to select them, then
-          remove them together. Etsy allows 10 photos and shows the first as the search thumbnail.
+          remove them together. The top one becomes the search thumbnail on Etsy.
         </p>
       </div>
 

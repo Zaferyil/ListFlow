@@ -474,8 +474,8 @@ export async function createDraftListing(
   };
 }
 
-/** Etsy allows ten photos on a listing. */
-export const MAX_LISTING_IMAGES = 10;
+/** Etsy's ceiling on listing photos. */
+export const MAX_LISTING_IMAGES = 20;
 
 /**
  * Adds one photo to a listing. Rank is the position in the gallery, starting

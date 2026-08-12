@@ -18,6 +18,9 @@ export interface TemplateImage {
   size: number;
 }
 
+/** How many template photos a blank may keep, all of which go on the listing. */
+export const MAX_TEMPLATE_IMAGES = 14;
+
 /**
  * Names come from the browser, so they are rebuilt from scratch rather than
  * trusted — a name like "../../etsy-tokens.json" must not reach a key.
