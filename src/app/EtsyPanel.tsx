@@ -13,7 +13,7 @@ interface TemplateReply {
 }
 
 /** How many template photos a blank may keep. All of them go on the listing. */
-const MAX_TEMPLATES = 14;
+const MAX_TEMPLATES = 15;
 
 /** Keeps the arranged order, adding anything the listing has not caught up
  *  with — a photo written a moment ago is not always in it yet. */
