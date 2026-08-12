@@ -76,24 +76,36 @@ export async function setOrder(productId: string, names: string[]): Promise<Temp
 /**
  * In the order the seller arranged, which is also the upload order. Anything
  * not yet ordered — a photo added since — follows in name order.
+ *
+ * The order file is what says a photo exists, not the key listing. On Netlify
+ * Blobs a listing is only eventually consistent: a photo written a moment ago
+ * may be absent from it, which showed up as an upload that appeared only once
+ * the next one was added. Reading a key by name is immediate, so the listing is
+ * now used to find photos the order file has not heard of, and each candidate
+ * is confirmed by the read that fetches its size anyway.
  */
 export async function listTemplates(productId: string): Promise<TemplateImage[]> {
-  const present = (await listKeys(prefixFor(productId))).filter(
-    (name) => extensionOf(name) in ALLOWED_TYPES,
-  );
   const order = (await readJson<string[]>(orderKey(productId))) ?? [];
+  const discovered = await listKeys(prefixFor(productId));
 
-  const ordered = order.filter((name) => present.includes(name));
-  const rest = present
-    .filter((name) => !ordered.includes(name))
+  const known = new Set(order);
+  const rest = discovered
+    .filter((name) => !known.has(name))
     .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
 
-  return Promise.all(
-    [...ordered, ...rest].map(async (name) => ({
-      name,
-      size: (await readBytes(keyFor(productId, name)))?.byteLength ?? 0,
-    })),
+  const candidates = [...new Set([...order, ...rest])].filter(
+    (name) => extensionOf(name) in ALLOWED_TYPES,
   );
+
+  const found = await Promise.all(
+    candidates.map(async (name) => {
+      const bytes = await readBytes(keyFor(productId, name));
+      // A name left over from a deleted photo simply is not there any more.
+      return bytes ? { name, size: bytes.byteLength } : null;
+    }),
+  );
+
+  return found.filter((image): image is TemplateImage => image !== null);
 }
 
 export async function readTemplate(productId: string, name: string): Promise<Buffer> {
@@ -111,9 +123,26 @@ export async function saveTemplate(
   contentTypeFor(safe);
 
   await writeBytes(keyFor(productId, safe), bytes);
+
+  // Recorded here so the photo is listed straight away, at the end of the
+  // gallery — where uploading it puts it.
+  const order = (await readJson<string[]>(orderKey(productId))) ?? [];
+  if (!order.includes(safe)) {
+    await writeJson(orderKey(productId), [...order, safe]);
+  }
+
   return { name: safe, size: bytes.byteLength };
 }
 
 export async function deleteTemplate(productId: string, name: string): Promise<void> {
-  await remove(keyFor(productId, name));
+  const safe = safeName(name);
+  await remove(keyFor(productId, safe));
+
+  const order = (await readJson<string[]>(orderKey(productId))) ?? [];
+  if (order.includes(safe)) {
+    await writeJson(
+      orderKey(productId),
+      order.filter((entry) => entry !== safe),
+    );
+  }
 }
