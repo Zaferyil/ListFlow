@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { Listing } from "@/lib/etsy";
 import { FileDrop } from "./FileDrop";
-import { FOR_ETSY, shrinkForUpload } from "./shrink";
+import { FOR_ETSY, prepareForUpload } from "./shrink";
 
 interface TemplateReply {
   images?: TemplateImage[];
@@ -235,7 +235,7 @@ export function EtsyPanel({
       // as an empty response rather than something worth showing.
       for (const file of files) {
         const form = new FormData();
-        form.append("images", await shrinkForUpload(file, FOR_ETSY));
+        form.append("images", await prepareForUpload(file, FOR_ETSY));
 
         const response = await fetch(
           `/api/etsy/templates?productId=${encodeURIComponent(productId)}`,

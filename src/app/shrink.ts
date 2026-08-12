@@ -82,7 +82,22 @@ function renamed(file: File, type: string): string {
  * cannot be decoded, or would not benefit. Never throws — a failure here should
  * let the upload go ahead as it did before rather than block the seller.
  */
-export async function shrinkForUpload(file: File, options: Options): Promise<File> {
+export async function prepareForUpload(file: File, options: Options): Promise<File> {
+  const ready = await shrinkForUpload(file, options);
+
+  // Shrinking gives the file back untouched when the browser could not decode
+  // it, and sending it anyway means the platform cuts the request off with an
+  // empty reply. Better to say so here, where the file name is still to hand.
+  if (!isSvg(ready) && ready.size > options.budget * 2) {
+    throw new Error(
+      `${file.name} could not be prepared for upload. Re-save it as a PNG or JPEG and try again.`,
+    );
+  }
+
+  return ready;
+}
+
+async function shrinkForUpload(file: File, options: Options): Promise<File> {
   // The server rasterises SVG itself, and the source is text — leave it alone.
   if (isSvg(file) || file.size <= options.budget) return file;
 
