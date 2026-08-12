@@ -11,16 +11,23 @@ import { dirname, join } from "path";
  * and bytes and does not know which one it got.
  */
 
+const STORE_NAME = "listflow";
+const ROOT = join(process.cwd(), ".data");
+
 /**
- * Whether this process is one of Netlify's, rather than a local `npm run dev`.
- *
- * NETLIFY alone is not enough: it is set while the site is being built, but not
- * inside the deployed function, so a deploy that looked fine would then try to
- * mkdir the read-only /var/task and fail. The other three are set by the
- * function runtime itself — NETLIFY_BLOBS_CONTEXT by Netlify when it wires up
- * the blob store, the AWS pair by the Lambda underneath it.
+ * Which of the two this process gets. Decided once, then remembered — the
+ * answer cannot change while the process lives.
  */
-function onNetlify(): boolean {
+let backend: "blobs" | "disk" | undefined;
+
+/**
+ * Netlify sets NETLIFY while the site is being built but not inside the
+ * deployed function, so it cannot be the whole test — the deploy would look
+ * fine and then fail at the first write. These are set by the function runtime
+ * itself: NETLIFY_BLOBS_CONTEXT by Netlify when it wires up the store, the AWS
+ * pair by the Lambda underneath it.
+ */
+function looksLikeNetlify(): boolean {
   return Boolean(
     process.env.NETLIFY ||
       process.env.NETLIFY_BLOBS_CONTEXT ||
@@ -29,8 +36,29 @@ function onNetlify(): boolean {
   );
 }
 
-const STORE_NAME = "listflow";
-const ROOT = join(process.cwd(), ".data");
+/**
+ * Blobs unless there is a writable folder to use instead.
+ *
+ * The variables above are the fast answer, but they are Netlify's to change, so
+ * the fallback asks the filesystem directly rather than trusting them: creating
+ * the folder is exactly what every write would go on to do, and where that is
+ * refused — /var/task is read-only — Blobs is the only thing left.
+ */
+async function useBlobs(): Promise<boolean> {
+  if (backend === undefined) {
+    if (looksLikeNetlify()) {
+      backend = "blobs";
+    } else {
+      try {
+        await mkdir(ROOT, { recursive: true });
+        backend = "disk";
+      } catch {
+        backend = "blobs";
+      }
+    }
+  }
+  return backend === "blobs";
+}
 
 /** Loaded lazily so the dependency is never pulled in during a local run. */
 async function blobStore() {
@@ -55,7 +83,7 @@ function pathFor(key: string): string {
 }
 
 export async function readBytes(key: string): Promise<Buffer | null> {
-  if (onNetlify()) {
+  if (await useBlobs()) {
     const blob = await (await blobStore()).get(key, { type: "arrayBuffer" });
     return blob ? Buffer.from(blob) : null;
   }
@@ -80,7 +108,7 @@ export async function readJson<T>(key: string): Promise<T | null> {
 }
 
 export async function writeBytes(key: string, bytes: Buffer): Promise<void> {
-  if (onNetlify()) {
+  if (await useBlobs()) {
     // Blobs takes an ArrayBuffer; a Buffer view may sit inside a larger pool.
     await (await blobStore()).set(key, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
     return;
@@ -96,7 +124,7 @@ export async function writeJson(key: string, value: unknown): Promise<void> {
 }
 
 export async function remove(key: string): Promise<void> {
-  if (onNetlify()) {
+  if (await useBlobs()) {
     await (await blobStore()).delete(key);
     return;
   }
@@ -111,7 +139,7 @@ export async function remove(key: string): Promise<void> {
 export async function listKeys(prefix: string): Promise<string[]> {
   const withSlash = prefix.endsWith("/") ? prefix : `${prefix}/`;
 
-  if (onNetlify()) {
+  if (await useBlobs()) {
     const { blobs } = await (await blobStore()).list({ prefix: withSlash });
     return blobs.map((blob) => blob.key.slice(withSlash.length)).filter((key) => !key.includes("/"));
   }
