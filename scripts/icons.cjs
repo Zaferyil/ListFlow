@@ -15,7 +15,7 @@ const SRC = 1254;
 // The supplied logo already draws a rounded card with a margin around it. A
 // phone rounds the icon itself, so the card is cropped to fill the frame;
 // otherwise the two roundings stack into a visible border.
-const CROP = { x: 96, y: 92, size: 1064 };
+const CROP = { x: 66, y: 62, size: 1128 };
 
 function full(size) {
   const scale = size / CROP.size;
