@@ -12,9 +12,9 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Etsy listings from a design file or a Google Sheet.",
     start_url: "/",
     display: "standalone",
-    // Matches the app's dark background, so the splash screen does not flash
-    // white before the page paints.
-    background_color: "#131120",
+    // The icon's own background, so the splash screen it fills does not sit on
+    // a different shade to the icon that opened it.
+    background_color: "#1a1433",
     theme_color: "#6c4bd8",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
