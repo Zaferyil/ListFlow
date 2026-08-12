@@ -6,6 +6,7 @@ import { DEFAULT_PRODUCT_ID, findProduct, PRODUCTS } from "@/lib/products";
 import { DropZone } from "./DropZone";
 import { EtsyPanel } from "./EtsyPanel";
 import { ListingCard } from "./ListingCard";
+import { shrinkForUpload } from "./shrink";
 
 type Tab = "design" | "niche" | "sheet";
 
@@ -116,11 +117,12 @@ function DesignTab({ productId }: TabProps) {
     setError(null);
     setResult(null);
 
-    const form = new FormData();
-    form.set("design", file);
-    form.set("productId", productId);
-
     try {
+      const form = new FormData();
+      // Sent at screen size, not print size — see shrinkForUpload.
+      form.set("design", await shrinkForUpload(file));
+      form.set("productId", productId);
+
       const response = await fetch("/api/analyze", { method: "POST", body: form });
       if (!response.ok) throw new Error(await errorFrom(response));
       setResult(await response.json());
