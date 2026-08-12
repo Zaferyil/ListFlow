@@ -35,6 +35,11 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Everything but the login screen, its own endpoint, and Next's static assets.
-  matcher: ["/((?!login|api/auth|_next/static|_next/image|favicon.ico).*)"],
+  // Everything but the login screen, its own endpoint, Next's static assets,
+  // and the icons — a phone fetches those while adding the app to the home
+  // screen, without the session cookie, and a redirect to /login there leaves
+  // it with no icon to show.
+  matcher: [
+    "/((?!login|api/auth|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon).*)",
+  ],
 };
