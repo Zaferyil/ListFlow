@@ -112,8 +112,8 @@ function BlankPicker({
           <p style={{ marginTop: "1.5rem", marginBottom: "0.5rem", fontWeight: 600, fontSize: "0.9rem", color: "#666" }}>
             Ornaments
           </p>
-          <div className="choices">
-            {ornaments.map((entry) => (
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            {ornaments.slice(0, 1).map((entry) => (
               <button
                 key={entry.id}
                 type="button"
