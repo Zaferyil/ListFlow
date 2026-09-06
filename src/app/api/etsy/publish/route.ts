@@ -6,6 +6,7 @@ import {
   getShop,
   updateListingInventory,
   uploadListingImage,
+  type VariationInput,
 } from "@/lib/etsy-api";
 import { contentTypeFor, listTemplates, readTemplate } from "@/lib/etsy-templates";
 import { getAccessToken } from "@/lib/etsy-tokens";
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
     let imageError: string | undefined;
 
     // For ornaments, automatically add standard variations with 3 properties
-    let finalVariations = variations;
+    let finalVariations: VariationInput | undefined = variations;
     if (product?.garment.includes("ornament") && !variations) {
       finalVariations = {
         sizeLabel: "Shape",
