@@ -420,6 +420,18 @@ export interface DraftListingInput {
   readinessStateId: number;
   tags: string[];
   materials: string[];
+  /** Shipping weight for the item */
+  itemWeight?: number;
+  /** Unit of shipping weight: "oz", "g", "lb" */
+  weightUnit?: "oz" | "g" | "lb";
+  /** Item length in dimensionsUnit */
+  itemLength?: number;
+  /** Item width in dimensionsUnit */
+  itemWidth?: number;
+  /** Item height in dimensionsUnit */
+  itemHeight?: number;
+  /** Unit of dimensions: "in" or "cm" */
+  dimensionsUnit?: "in" | "cm";
 }
 
 export interface CreatedListing {
@@ -455,6 +467,24 @@ export async function createDraftListing(
 
   if (input.shippingProfileId) {
     body.shipping_profile_id = input.shippingProfileId;
+  }
+
+  // Add shipping dimensions if provided (required for physical goods on some categories)
+  if (input.itemWeight !== undefined && input.weightUnit) {
+    body.item_weight = input.itemWeight;
+    body.item_weight_unit = input.weightUnit;
+  }
+
+  if (
+    input.itemLength !== undefined &&
+    input.itemWidth !== undefined &&
+    input.itemHeight !== undefined &&
+    input.dimensionsUnit
+  ) {
+    body.item_length = input.itemLength;
+    body.item_width = input.itemWidth;
+    body.item_height = input.itemHeight;
+    body.item_dimensions_unit = input.dimensionsUnit;
   }
 
   const created = await etsyFetch<{ listing_id: number; url?: string }>(

@@ -9,6 +9,7 @@ import {
 } from "@/lib/etsy-api";
 import { contentTypeFor, listTemplates, readTemplate } from "@/lib/etsy-templates";
 import { getAccessToken } from "@/lib/etsy-tokens";
+import { findProduct } from "@/lib/products";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -57,7 +58,20 @@ export async function POST(request: Request) {
       ? Math.min(...variations.sizes.map((size) => size.price))
       : draft.price;
 
-    const listing = await createDraftListing(accessToken, shop.shopId, { ...draft, price });
+    // Get product shipping info if available
+    const product = productId ? findProduct(productId) : null;
+    const draftWithShipping = {
+      ...draft,
+      price,
+      itemWeight: product?.shippingWeight,
+      weightUnit: product?.weightUnit,
+      itemLength: product?.shippingDimensions?.length,
+      itemWidth: product?.shippingDimensions?.width,
+      itemHeight: product?.shippingDimensions?.height,
+      dimensionsUnit: product?.dimensionsUnit,
+    };
+
+    const listing = await createDraftListing(accessToken, shop.shopId, draftWithShipping);
 
     // Past this point the draft exists, so a later failure is reported
     // alongside its link rather than thrown — otherwise the seller is left

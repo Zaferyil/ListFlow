@@ -44,6 +44,14 @@ export interface Product {
    */
   colors?: string[];
   source: string;
+  /** Shipping weight in weight_unit (e.g., 2.5 for 2.5 oz). */
+  shippingWeight?: number;
+  /** Unit for shipping weight: "oz", "g", "lb" */
+  weightUnit?: "oz" | "g" | "lb";
+  /** Dimensions in dimensions_unit (length, width, height). */
+  shippingDimensions?: { length: number; width: number; height: number };
+  /** Unit for dimensions: "in" (inches) or "cm" (centimeters) */
+  dimensionsUnit?: "in" | "cm";
 }
 
 export const PRODUCTS: Product[] = [
@@ -246,6 +254,10 @@ export const PRODUCTS: Product[] = [
     requiredKeywords: [],
     colors: ["White"],
     source: "Ceramic ornament supplier",
+    shippingWeight: 2.5,
+    weightUnit: "oz",
+    shippingDimensions: { length: 3.0, width: 3.0, height: 0.5 },
+    dimensionsUnit: "in",
   },
 ];
 
