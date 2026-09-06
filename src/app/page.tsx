@@ -64,7 +64,6 @@ function Step({
 }
 
 interface OrnamentVariations {
-  shape?: "heart" | "round";
   quantity?: number;
 }
 
@@ -139,49 +138,24 @@ function BlankPicker({
                 border: "1px solid #e0e0e0",
               }}
             >
-              <p style={{ margin: "0 0 0.75rem 0", fontWeight: 500, fontSize: "0.9rem" }}>
-                Ornament variations:
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label htmlFor="ornament-shape">Shape</label>
-                  <select
-                    id="ornament-shape"
-                    value={ornamentVariations.shape || ""}
-                    onChange={(e) =>
-                      setOrnamentVariations((prev) => ({
-                        ...prev,
-                        shape: (e.target.value as "heart" | "round") || undefined,
-                      }))
-                    }
-                  >
-                    <option value="">Select shape…</option>
-                    <option value="heart">Heart (3.0")</option>
-                    <option value="round">Round (2.85")</option>
-                  </select>
-                </div>
-
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label htmlFor="ornament-quantity">Quantity per order</label>
-                  <input
-                    id="ornament-quantity"
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={ornamentVariations.quantity || "1"}
-                    onChange={(e) =>
-                      setOrnamentVariations((prev) => ({
-                        ...prev,
-                        quantity: Number(e.target.value) || 1,
-                      }))
-                    }
-                  />
-                </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="ornament-quantity">Quantity per order</label>
+                <input
+                  id="ornament-quantity"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={ornamentVariations.quantity || "1"}
+                  onChange={(e) =>
+                    setOrnamentVariations((prev) => ({
+                      ...prev,
+                      quantity: Number(e.target.value) || 1,
+                    }))
+                  }
+                />
               </div>
               <p style={{ margin: "0.75rem 0 0 0", fontSize: "0.85rem", color: "#666" }}>
-                {ornamentVariations.shape && ornamentVariations.quantity
-                  ? `${ornamentVariations.quantity} × ${ornamentVariations.shape} ornament${ornamentVariations.quantity > 1 ? "s" : ""}`
-                  : "Configure your ornament order above"}
+                Müşteri Etsy'de şekil (Kalp/Yuvarlak) seçebilir.
               </p>
             </div>
           )}
