@@ -304,6 +304,9 @@ export function EtsyPanel({
     setSelected([]);
   }
 
+  const product = findProduct(productId);
+  const isOrnament = product.garment.includes("ornament");
+
   const update = useCallback(
     (patch: Partial<PublishSettings>) => {
       setSettings((current) => {
@@ -336,9 +339,6 @@ export function EtsyPanel({
     setError(null);
     setResult(null);
     try {
-      const product = findProduct(productId);
-      const isOrnament = product.garment.includes("ornament");
-
       const response = await fetch("/api/etsy/publish", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -560,18 +560,22 @@ export function EtsyPanel({
         </div>
       </div>
 
-      <div className="field">
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={settings.variationsOn}
-            onChange={(event) => update({ variationsOn: event.target.checked })}
-          />
-          Add size and colour variations
-        </label>
-      </div>
+      {!isOrnament && (
+        <>
+          <div className="field">
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={settings.variationsOn}
+                onChange={(event) => update({ variationsOn: event.target.checked })}
+              />
+              Add size and colour variations
+            </label>
+          </div>
+        </>
+      )}
 
-      {settings.variationsOn && (
+      {!isOrnament && settings.variationsOn && (
         <>
           <div className="field">
             <label htmlFor="etsy-size-label">Name of the first menu</label>
@@ -621,6 +625,13 @@ export function EtsyPanel({
               : "No sizes recognised yet."}
           </p>
         </>
+      )}
+
+      {isOrnament && (
+        <p className="hint" style={{ marginTop: "1rem", padding: "0.75rem", backgroundColor: "var(--color-bg-hint)" }}>
+          <strong>Ornament variations</strong> — Shape (Heart/Round), Print (One-Side/Two-Sides), and
+          Quantity ({ornamentQuantity} each) are automatically generated and sent to Etsy.
+        </p>
       )}
 
       <div className="field">
