@@ -339,30 +339,36 @@ export async function updateListingInventory(
   const colorValues = colors.length > 0 ? colors : [null];
   const products: InventoryProduct[] = [];
 
-  // Whichever menu carries the prices takes the slot the seller wants shown
-  // second; the other takes the remaining one.
+  // Etsy shows the menus in the order they are listed on each product, not by
+  // property id, so putting the priced menu second is a matter of listing the
+  // plain one first.
   const pricedProperty = input.pricedMenuSecond ? COLOR_PROPERTY : SIZE_PROPERTY;
   const plainProperty = input.pricedMenuSecond ? SIZE_PROPERTY : COLOR_PROPERTY;
 
   for (const size of sizes) {
     for (const color of colorValues) {
-      const propertyValues = [
-        {
-          property_id: pricedProperty,
-          property_name: input.sizeLabel.trim() || "Size",
-          value_ids: [],
-          values: [size.name.trim()],
-        },
-      ];
+      const priced = {
+        property_id: pricedProperty,
+        property_name: input.sizeLabel.trim() || "Size",
+        value_ids: [],
+        values: [size.name.trim()],
+      };
+      const plain =
+        color === null
+          ? null
+          : {
+              property_id: plainProperty,
+              property_name: input.colorLabel?.trim() || "Color",
+              value_ids: [],
+              values: [color],
+            };
 
-      if (color !== null) {
-        propertyValues.push({
-          property_id: plainProperty,
-          property_name: input.colorLabel?.trim() || "Color",
-          value_ids: [],
-          values: [color],
-        });
-      }
+      const propertyValues =
+        plain === null
+          ? [priced]
+          : input.pricedMenuSecond
+            ? [plain, priced]
+            : [priced, plain];
 
       products.push({
         sku: "",
