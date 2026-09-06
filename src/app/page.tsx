@@ -66,21 +66,15 @@ function Step({
 function BlankPicker({
   productId,
   onProductChange,
-  ornamentQuantity,
-  onOrnamentQuantityChange,
 }: {
   productId: string;
   onProductChange: (value: string) => void;
-  ornamentQuantity: number;
-  onOrnamentQuantityChange: (value: number) => void;
 }) {
   const product = findProduct(productId);
 
   // Separate garments from ornaments
   const garments = PRODUCTS.filter((p) => !p.garment.includes("ornament"));
   const ornaments = PRODUCTS.filter((p) => p.garment.includes("ornament"));
-
-  const isOrnament = product.garment.includes("ornament");
 
   return (
     <div className="card">
@@ -124,22 +118,6 @@ function BlankPicker({
             ))}
           </div>
 
-          {isOrnament && (
-            <div className="field" style={{ marginTop: "1rem" }}>
-              <label htmlFor="ornament-qty">Quantity per variation (1-12)</label>
-              <select
-                id="ornament-qty"
-                value={ornamentQuantity}
-                onChange={(event) => onOrnamentQuantityChange(Number(event.target.value))}
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
-                  <option key={num} value={num}>
-                    {num}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
         </>
       )}
 
@@ -161,11 +139,7 @@ interface TabProps {
   productId: string;
 }
 
-interface DesignTabProps extends TabProps {
-  ornamentQuantity: number;
-}
-
-function DesignTab({ productId, ornamentQuantity }: DesignTabProps) {
+function DesignTab({ productId }: TabProps) {
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<SingleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -216,21 +190,13 @@ function DesignTab({ productId, ornamentQuantity }: DesignTabProps) {
         )}
       </Step>
 
-      <EtsyStep listing={result?.listing ?? null} productId={productId} ornamentQuantity={ornamentQuantity} />
+      <EtsyStep listing={result?.listing ?? null} productId={productId} />
     </>
   );
 }
 
 /** Step 4: connecting the shop is one-time setup, so it shows before a listing exists too. */
-function EtsyStep({
-  listing,
-  productId,
-  ornamentQuantity,
-}: {
-  listing: Listing | null;
-  productId: string;
-  ornamentQuantity: number;
-}) {
+function EtsyStep({ listing, productId }: { listing: Listing | null; productId: string }) {
   return (
     <Step
       number={4}
@@ -241,17 +207,12 @@ function EtsyStep({
         listing={listing}
         productId={productId}
         catalogColors={(findProduct(productId).colors ?? []).join("\n")}
-        ornamentQuantity={ornamentQuantity}
       />
     </Step>
   );
 }
 
-interface NicheTabProps extends TabProps {
-  ornamentQuantity: number;
-}
-
-function NicheTab({ productId, ornamentQuantity }: NicheTabProps) {
+function NicheTab({ productId }: TabProps) {
   const [niche, setNiche] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -307,7 +268,7 @@ function NicheTab({ productId, ornamentQuantity }: NicheTabProps) {
         )}
       </Step>
 
-      <EtsyStep listing={result?.listing ?? null} productId={productId} ornamentQuantity={ornamentQuantity} />
+      <EtsyStep listing={result?.listing ?? null} productId={productId} />
     </>
   );
 }
@@ -353,11 +314,7 @@ function LayoutSummary({
   );
 }
 
-interface SheetTabProps extends TabProps {
-  ornamentQuantity: number;
-}
-
-function SheetTab({ productId, ornamentQuantity }: SheetTabProps) {
+function SheetTab({ productId }: TabProps) {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [sheetName, setSheetName] = useState("Nis Listesi");
   const [limit, setLimit] = useState(5);
@@ -565,7 +522,6 @@ const TABS: { id: Tab; label: string; short: string }[] = [
 export default function Home() {
   const [tab, setTab] = useState<Tab>("design");
   const [productId, setProductId] = useState(DEFAULT_PRODUCT_ID);
-  const [ornamentQuantity, setOrnamentQuantity] = useState(1);
 
   return (
     <>
@@ -614,17 +570,12 @@ export default function Home() {
           title="Blank"
           description="Its real fabric specs go into every listing you generate."
         >
-          <BlankPicker
-            productId={productId}
-            onProductChange={setProductId}
-            ornamentQuantity={ornamentQuantity}
-            onOrnamentQuantityChange={setOrnamentQuantity}
-          />
+          <BlankPicker productId={productId} onProductChange={setProductId} />
         </Step>
 
-        {tab === "design" && <DesignTab productId={productId} ornamentQuantity={ornamentQuantity} />}
-        {tab === "niche" && <NicheTab productId={productId} ornamentQuantity={ornamentQuantity} />}
-        {tab === "sheet" && <SheetTab productId={productId} ornamentQuantity={ornamentQuantity} />}
+        {tab === "design" && <DesignTab productId={productId} />}
+        {tab === "niche" && <NicheTab productId={productId} />}
+        {tab === "sheet" && <SheetTab productId={productId} />}
       </main>
     </>
   );

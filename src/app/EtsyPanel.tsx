@@ -146,12 +146,12 @@ const DEFAULTS: PublishSettings = {
  * prices differ per line. Editable like any other blank's size run.
  */
 const ORNAMENT_DEFAULTS: Pick<PublishSettings, "sizeLabel" | "sizesText"> = {
-  sizeLabel: "Style",
+  sizeLabel: "Ornament Styles",
   sizesText: [
-    "Heart One-Side = 16.99",
-    "Heart Two-Sides = 19.99",
-    "Round One-Side = 16.99",
-    "Round Two-Sides = 19.99",
+    "Heart Ornament - One-Sided = 16.99",
+    "Heart Ornament - Two-Sided = 19.99",
+    "Round Ornament - One-Sided = 16.99",
+    "Round Ornament - Two-Sided = 19.99",
   ].join("\n"),
 };
 
@@ -216,14 +216,12 @@ export function EtsyPanel({
   listing,
   productId,
   catalogColors,
-  ornamentQuantity = 1,
 }: {
   listing: Listing | null;
   productId: string;
   /** Newline-separated, so the effect below compares by value and does not
    * reset the seller's edits on every render. */
   catalogColors: string;
-  ornamentQuantity?: number;
 }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -384,7 +382,6 @@ export function EtsyPanel({
           whoMade: settings.whoMade,
           whenMade: settings.whenMade,
           productId,
-          ornamentQuantity: isOrnament ? ornamentQuantity : undefined,
           // An ornament always varies, on the styles edited above; the second
           // menu is quantity rather than colour. Sending nothing here would
           // leave the server to fall back to its own built-in styles, which
@@ -708,7 +705,7 @@ export function EtsyPanel({
             like, and it is saved for this blank. The second menu is{" "}
             <strong>Quantity 1–{ORNAMENT_QUANTITY_OPTIONS}</strong>, added for you.{" "}
             {sizeCount > 0
-              ? `${offeringCount} combinations — ${sizeCount} style${sizeCount === 1 ? "" : "s"} × ${ORNAMENT_QUANTITY_OPTIONS} quantities, ${ornamentQuantity} in stock each.`
+              ? `${offeringCount} combinations — ${sizeCount} style${sizeCount === 1 ? "" : "s"} × ${ORNAMENT_QUANTITY_OPTIONS} quantities.`
               : "No styles recognised yet."}
           </p>
         </>

@@ -41,9 +41,15 @@ const bodySchema = z.object({
   variations: variationsSchema.optional(),
   /** Which blank's template photos to attach. */
   productId: z.string().trim().min(1).optional(),
-  /** For ornaments: quantity per variation (1-12). */
-  ornamentQuantity: z.number().int().min(1).max(12).optional(),
 });
+
+/**
+ * Stock held against each ornament offering. Ornaments are stocked per
+ * shape/print/quantity combination rather than per listing, and the figure is
+ * the same on every one, so it is a constant here rather than another field for
+ * the seller to fill in on each listing.
+ */
+const ORNAMENT_STOCK = 15;
 
 /** Pushes one generated listing to Etsy as a draft. Nothing is published live. */
 export async function POST(request: Request) {
@@ -53,7 +59,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { variations, productId, ornamentQuantity, ...draft } = parsed.data;
+    const { variations, productId, ...draft } = parsed.data;
     const accessToken = await getAccessToken();
     const shop = await getShop(accessToken);
 
@@ -84,47 +90,44 @@ export async function POST(request: Request) {
     let variationError: string | undefined;
     let imageError: string | undefined;
 
-    // For ornaments, automatically add standard variations using 2 properties
-    // Combine Shape + Print into sizes, use Quantity as colors
-    // (Property 515 is deprecated, so we can't use 3 properties)
+    // An ornament varies on shape and print side, and on how many the buyer
+    // wants. Etsy only has two variation slots — property 515 is deprecated and
+    // rejected outright — so shape and print share the first menu and quantity
+    // takes the second. The panel normally sends its own edited styles and
+    // prices; this stands in for callers that send none.
+    const isOrnament = Boolean(product?.garment.includes("ornament"));
+    // Ornaments carry their stock per offering; everything else stocks the
+    // listing as a whole and repeats that figure across its variations.
+    const variationQuantity = isOrnament ? ORNAMENT_STOCK : draft.quantity;
+
     let finalVariations: VariationInput | undefined;
-    if (product?.garment.includes("ornament") && !variations) {
-      const qty = ornamentQuantity || 1;
-      // Create all combinations of Shape × Print
-      const shapes = ["Heart", "Round"];
-      const prints = ["One-Side", "Two-Sides"];
-      const combinedSizes: { name: string; price: number }[] = [];
+    if (isOrnament && !variations) {
+      const combinedSizes = ["Heart Ornament", "Round Ornament"].flatMap((shape) =>
+        ["One-Sided", "Two-Sided"].map((print) => ({
+          name: `${shape} - ${print}`,
+          price: draft.price,
+        })),
+      );
 
-      for (const shape of shapes) {
-        for (const print of prints) {
-          combinedSizes.push({
-            name: `${shape} ${print}`,
-            price: draft.price,
-          });
-        }
-      }
-
-      // Quantities 1-12 as color options
-      const quantities = Array.from({ length: 12 }, (_, i) => String(i + 1));
+      const quantities = Array.from({ length: 12 }, (_, index) => String(index + 1));
 
       finalVariations = {
-        sizeLabel: "Style",
+        sizeLabel: "Ornament Styles",
         sizes: combinedSizes,
         colors: quantities,
         colorLabel: "Quantity",
-        quantity: qty,
+        quantity: variationQuantity,
         readinessStateId: draft.readinessStateId,
       };
     } else if (variations) {
       finalVariations = {
         ...variations,
-        quantity: draft.quantity,
+        quantity: variationQuantity,
         readinessStateId: draft.readinessStateId,
       };
     }
 
-    // Both branches above already carry the right quantity — the ornament
-    // defaults use the seller's per-variation stock, not the listing's.
+    // Both branches above already carry the right quantity.
     if (finalVariations) {
       try {
         await updateListingInventory(accessToken, listing.listingId, finalVariations);
