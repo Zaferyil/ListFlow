@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     let imageError: string | undefined;
 
     // For ornaments, automatically add standard variations with 3 properties
-    let finalVariations: VariationInput | undefined = variations;
+    let finalVariations: VariationInput | undefined;
     if (product?.garment.includes("ornament") && !variations) {
       finalVariations = {
         sizeLabel: "Shape",
@@ -92,6 +92,12 @@ export async function POST(request: Request) {
         colors: ["One-Side", "Two-Sides"],
         materials: Array.from({ length: 12 }, (_, i) => String(i + 1)),
         materialLabel: "Quantity",
+        quantity: draft.quantity,
+        readinessStateId: draft.readinessStateId,
+      };
+    } else if (variations) {
+      finalVariations = {
+        ...variations,
         quantity: draft.quantity,
         readinessStateId: draft.readinessStateId,
       };
