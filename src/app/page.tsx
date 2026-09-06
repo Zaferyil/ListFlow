@@ -63,6 +63,11 @@ function Step({
   );
 }
 
+interface OrnamentVariations {
+  shape?: "heart" | "round";
+  quantity?: number;
+}
+
 function BlankPicker({
   productId,
   onProductChange,
@@ -70,23 +75,119 @@ function BlankPicker({
   productId: string;
   onProductChange: (value: string) => void;
 }) {
+  const [ornamentVariations, setOrnamentVariations] = useState<OrnamentVariations>({});
   const product = findProduct(productId);
+
+  // Separate garments from ornaments
+  const garments = PRODUCTS.filter((p) => !p.garment.includes("ornament"));
+  const ornaments = PRODUCTS.filter((p) => p.garment.includes("ornament"));
+
+  const isOrnament = product.garment.includes("ornament");
 
   return (
     <div className="card">
-      <div className="choices">
-        {PRODUCTS.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            className="choice"
-            aria-pressed={entry.id === productId}
-            onClick={() => onProductChange(entry.id)}
-          >
-            {entry.label}
-          </button>
-        ))}
-      </div>
+      {garments.length > 0 && (
+        <>
+          <p style={{ marginTop: 0, fontWeight: 600, fontSize: "0.9rem", color: "#666" }}>
+            Garments
+          </p>
+          <div className="choices">
+            {garments.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className="choice"
+                aria-pressed={entry.id === productId}
+                onClick={() => onProductChange(entry.id)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {ornaments.length > 0 && (
+        <>
+          <p style={{ marginTop: "1.5rem", marginBottom: "0.5rem", fontWeight: 600, fontSize: "0.9rem", color: "#666" }}>
+            Ornaments
+          </p>
+          <div className="choices">
+            {ornaments.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className="choice"
+                aria-pressed={entry.id === productId}
+                onClick={() => {
+                  onProductChange(entry.id);
+                  setOrnamentVariations({});
+                }}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+
+          {isOrnament && (
+            <div
+              style={{
+                marginTop: "1rem",
+                padding: "1rem",
+                backgroundColor: "#f9f9f9",
+                borderRadius: "0.5rem",
+                border: "1px solid #e0e0e0",
+              }}
+            >
+              <p style={{ margin: "0 0 0.75rem 0", fontWeight: 500, fontSize: "0.9rem" }}>
+                Ornament variations:
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label htmlFor="ornament-shape">Shape</label>
+                  <select
+                    id="ornament-shape"
+                    value={ornamentVariations.shape || ""}
+                    onChange={(e) =>
+                      setOrnamentVariations((prev) => ({
+                        ...prev,
+                        shape: (e.target.value as "heart" | "round") || undefined,
+                      }))
+                    }
+                  >
+                    <option value="">Select shape…</option>
+                    <option value="heart">Heart (3.0")</option>
+                    <option value="round">Round (2.85")</option>
+                  </select>
+                </div>
+
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label htmlFor="ornament-quantity">Quantity per order</label>
+                  <input
+                    id="ornament-quantity"
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={ornamentVariations.quantity || "1"}
+                    onChange={(e) =>
+                      setOrnamentVariations((prev) => ({
+                        ...prev,
+                        quantity: Number(e.target.value) || 1,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <p style={{ margin: "0.75rem 0 0 0", fontSize: "0.85rem", color: "#666" }}>
+                {ornamentVariations.shape && ornamentVariations.quantity
+                  ? `${ornamentVariations.quantity} × ${ornamentVariations.shape} ornament${ornamentVariations.quantity > 1 ? "s" : ""}`
+                  : "Configure your ornament order above"}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
       <p className="hint">
         {product.composition} · {product.weight} · {product.fit}
         {product.colorCaveat ? ` — ${product.colorCaveat}` : ""}
