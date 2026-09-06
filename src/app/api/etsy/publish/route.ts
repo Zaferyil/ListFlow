@@ -79,10 +79,25 @@ export async function POST(request: Request) {
     let variationError: string | undefined;
     let imageError: string | undefined;
 
-    if (variations) {
+    // For ornaments, automatically add standard variations
+    let finalVariations = variations;
+    if (product?.garment.includes("ornament") && !variations) {
+      finalVariations = {
+        sizeLabel: "Personalization",
+        sizes: [
+          { name: "Heart / One-Side", price: draft.price },
+          { name: "Heart / Two-Sides", price: draft.price },
+          { name: "Round / One-Side", price: draft.price },
+          { name: "Round / Two-Sides", price: draft.price },
+        ],
+        colors: Array.from({ length: 12 }, (_, i) => String(i + 1)),
+      };
+    }
+
+    if (finalVariations) {
       try {
         await updateListingInventory(accessToken, listing.listingId, {
-          ...variations,
+          ...finalVariations,
           quantity: draft.quantity,
           readinessStateId: draft.readinessStateId,
         });
