@@ -63,10 +63,6 @@ function Step({
   );
 }
 
-interface OrnamentVariations {
-  quantity?: number;
-}
-
 function BlankPicker({
   productId,
   onProductChange,
@@ -74,7 +70,6 @@ function BlankPicker({
   productId: string;
   onProductChange: (value: string) => void;
 }) {
-  const [ornamentVariations, setOrnamentVariations] = useState<OrnamentVariations>({});
   const product = findProduct(productId);
 
   // Separate garments from ornaments
@@ -118,47 +113,13 @@ function BlankPicker({
                 type="button"
                 className="choice"
                 aria-pressed={entry.id === productId}
-                onClick={() => {
-                  onProductChange(entry.id);
-                  setOrnamentVariations({});
-                }}
+                onClick={() => onProductChange(entry.id)}
               >
                 {entry.label}
               </button>
             ))}
           </div>
 
-          {isOrnament && (
-            <div
-              style={{
-                marginTop: "1rem",
-                padding: "1rem",
-                backgroundColor: "#f9f9f9",
-                borderRadius: "0.5rem",
-                border: "1px solid #e0e0e0",
-              }}
-            >
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label htmlFor="ornament-quantity">Quantity per order</label>
-                <input
-                  id="ornament-quantity"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={ornamentVariations.quantity || "1"}
-                  onChange={(e) =>
-                    setOrnamentVariations((prev) => ({
-                      ...prev,
-                      quantity: Number(e.target.value) || 1,
-                    }))
-                  }
-                />
-              </div>
-              <p style={{ margin: "0.75rem 0 0 0", fontSize: "0.85rem", color: "#666" }}>
-                Müşteri Etsy'de şekil (Kalp/Yuvarlak) seçebilir.
-              </p>
-            </div>
-          )}
         </>
       )}
 
