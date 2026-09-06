@@ -64,6 +64,9 @@ interface Category {
 interface PublishResult {
   listing: { url: string; listingId: number };
   variations?: boolean;
+  /** How many offerings were actually sent — the panel's own count does not
+   *  cover the ornament defaults, which are built server-side. */
+  variationCount?: number;
   variationError?: string;
   uploaded?: number;
   imageError?: string;
@@ -356,13 +359,17 @@ export function EtsyPanel({
           whenMade: settings.whenMade,
           productId,
           ornamentQuantity: isOrnament ? ornamentQuantity : undefined,
-          variations: settings.variationsOn
-            ? {
-                sizeLabel: settings.sizeLabel,
-                sizes: parseSizes(settings.sizesText),
-                colors: parseColors(settings.colorsText),
-              }
-            : undefined,
+          // Ornaments are left to the server's own defaults. A blank that was
+          // set up manually before keeps variationsOn in localStorage, and
+          // sending that would override the defaults with a stale size run.
+          variations:
+            settings.variationsOn && !isOrnament
+              ? {
+                  sizeLabel: settings.sizeLabel,
+                  sizes: parseSizes(settings.sizesText),
+                  colors: parseColors(settings.colorsText),
+                }
+              : undefined,
         }),
       });
       const body = await response.json();
@@ -433,7 +440,11 @@ export function EtsyPanel({
     settings.taxonomyId !== null &&
     settings.readinessStateId !== null &&
     Number(settings.price) > 0 &&
-    (!settings.variationsOn || (sizeCount > 0 && settings.sizeLabel.trim().length > 0));
+    // Only the manual editor can be left half-filled; the ornament defaults
+    // are built server-side and are always complete.
+    (isOrnament ||
+      !settings.variationsOn ||
+      (sizeCount > 0 && settings.sizeLabel.trim().length > 0));
 
   return (
     <div className="card">
@@ -629,8 +640,9 @@ export function EtsyPanel({
 
       {isOrnament && (
         <p className="hint" style={{ marginTop: "1rem", padding: "0.75rem", backgroundColor: "var(--color-bg-hint)" }}>
-          <strong>Ornament variations</strong> — Shape (Heart/Round), Print (One-Side/Two-Sides), and
-          Quantity ({ornamentQuantity} each) are automatically generated and sent to Etsy.
+          <strong>Ornament variations</strong> — Style (Heart One-Side, Heart Two-Sides, Round One-Side,
+          Round Two-Sides) × Quantity (1–12) are generated automatically: 48 combinations, {ornamentQuantity}{" "}
+          in stock each.
         </p>
       )}
 
@@ -783,7 +795,8 @@ export function EtsyPanel({
       {result && (
         <>
           <div className="alert info" style={{ marginTop: "1rem" }}>
-            Draft created{result.variations ? ` with ${offeringCount} variations` : ""}
+            Draft created
+            {result.variations ? ` with ${result.variationCount ?? offeringCount} variations` : ""}
             {result.uploaded ? ` and ${result.uploaded} photos` : ""}.{" "}
             <a href={result.listing.url} target="_blank" rel="noreferrer">
               Open listing {result.listing.listingId} on Etsy

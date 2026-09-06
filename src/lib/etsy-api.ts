@@ -263,7 +263,10 @@ export async function getProcessingProfiles(
  */
 const SIZE_PROPERTY = 513;
 const COLOR_PROPERTY = 514;
-const MATERIAL_PROPERTY = 515;
+// There is no third slot: Etsy deprecated property 515 and rejects any request
+// carrying it ("Property id(s) 515 are deprecated"). A third axis has to be
+// folded into one of these two — see the ornament defaults in the publish route,
+// which combine shape and print into a single "Style" value.
 
 /** Etsy caps a single variation at 70 values. */
 export const MAX_VARIATION_VALUES = 70;
@@ -282,9 +285,8 @@ export interface VariationInput {
   sizeLabel: string;
   sizes: SizeVariation[];
   colors: string[];
-  /** Optional 3rd property (e.g. materials for ornaments). */
-  materials?: string[];
-  materialLabel?: string;
+  /** What the second menu is called on Etsy. Defaults to "Color". */
+  colorLabel?: string;
   quantity: number;
   readinessStateId: number;
 }
@@ -319,63 +321,50 @@ export async function updateListingInventory(
 ): Promise<void> {
   const sizes = input.sizes.filter((size) => size.name.trim() && size.price > 0);
   const colors = input.colors.map((color) => color.trim()).filter(Boolean);
-  const materials = (input.materials ?? []).map((m) => m.trim()).filter(Boolean);
 
   if (sizes.length === 0) {
     throw new Error("Add at least one size before sending variations.");
   }
-  if (sizes.length > MAX_VARIATION_VALUES || colors.length > MAX_VARIATION_VALUES || materials.length > MAX_VARIATION_VALUES) {
+  if (sizes.length > MAX_VARIATION_VALUES || colors.length > MAX_VARIATION_VALUES) {
     throw new Error(`Etsy allows at most ${MAX_VARIATION_VALUES} values per variation.`);
   }
 
   // No colours means a single-axis listing rather than an empty second axis.
   const colorValues = colors.length > 0 ? colors : [null];
-  const materialValues = materials.length > 0 ? materials : [null];
   const products: InventoryProduct[] = [];
 
   for (const size of sizes) {
     for (const color of colorValues) {
-      for (const material of materialValues) {
-        const propertyValues = [
-          {
-            property_id: SIZE_PROPERTY,
-            property_name: input.sizeLabel.trim() || "Size",
-            value_ids: [],
-            values: [size.name.trim()],
-          },
-        ];
+      const propertyValues = [
+        {
+          property_id: SIZE_PROPERTY,
+          property_name: input.sizeLabel.trim() || "Size",
+          value_ids: [],
+          values: [size.name.trim()],
+        },
+      ];
 
-        if (color !== null) {
-          propertyValues.push({
-            property_id: COLOR_PROPERTY,
-            property_name: "Color",
-            value_ids: [],
-            values: [color],
-          });
-        }
-
-        if (material !== null) {
-          propertyValues.push({
-            property_id: MATERIAL_PROPERTY,
-            property_name: input.materialLabel || "Material",
-            value_ids: [],
-            values: [material],
-          });
-        }
-
-        products.push({
-          sku: "",
-          property_values: propertyValues,
-          offerings: [
-            {
-              price: size.price,
-              quantity: input.quantity,
-              is_enabled: true,
-              readiness_state_id: input.readinessStateId,
-            },
-          ],
+      if (color !== null) {
+        propertyValues.push({
+          property_id: COLOR_PROPERTY,
+          property_name: input.colorLabel?.trim() || "Color",
+          value_ids: [],
+          values: [color],
         });
       }
+
+      products.push({
+        sku: "",
+        property_values: propertyValues,
+        offerings: [
+          {
+            price: size.price,
+            quantity: input.quantity,
+            is_enabled: true,
+            readiness_state_id: input.readinessStateId,
+          },
+        ],
+      });
     }
   }
 

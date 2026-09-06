@@ -82,20 +82,34 @@ export async function POST(request: Request) {
     let variationError: string | undefined;
     let imageError: string | undefined;
 
-    // For ornaments, automatically add standard variations with 3 properties
-    // Use ornamentQuantity (1-12) for variation quantity, keep draft.quantity for listing stock
+    // For ornaments, automatically add standard variations using 2 properties
+    // Combine Shape + Print into sizes, use Quantity as colors
+    // (Property 515 is deprecated, so we can't use 3 properties)
     let finalVariations: VariationInput | undefined;
     if (product?.garment.includes("ornament") && !variations) {
       const qty = ornamentQuantity || 1;
+      // Create all combinations of Shape × Print
+      const shapes = ["Heart", "Round"];
+      const prints = ["One-Side", "Two-Sides"];
+      const combinedSizes: { name: string; price: number }[] = [];
+
+      for (const shape of shapes) {
+        for (const print of prints) {
+          combinedSizes.push({
+            name: `${shape} ${print}`,
+            price: draft.price,
+          });
+        }
+      }
+
+      // Quantities 1-12 as color options
+      const quantities = Array.from({ length: 12 }, (_, i) => String(i + 1));
+
       finalVariations = {
-        sizeLabel: "Shape",
-        sizes: [
-          { name: "Heart", price: draft.price },
-          { name: "Round", price: draft.price },
-        ],
-        colors: ["One-Side", "Two-Sides"],
-        materials: Array.from({ length: 12 }, (_, i) => String(i + 1)),
-        materialLabel: "Quantity",
+        sizeLabel: "Style",
+        sizes: combinedSizes,
+        colors: quantities,
+        colorLabel: "Quantity",
         quantity: qty,
         readinessStateId: draft.readinessStateId,
       };
@@ -107,13 +121,11 @@ export async function POST(request: Request) {
       };
     }
 
+    // Both branches above already carry the right quantity — the ornament
+    // defaults use the seller's per-variation stock, not the listing's.
     if (finalVariations) {
       try {
-        await updateListingInventory(accessToken, listing.listingId, {
-          ...finalVariations,
-          quantity: draft.quantity,
-          readinessStateId: draft.readinessStateId,
-        });
+        await updateListingInventory(accessToken, listing.listingId, finalVariations);
       } catch (error) {
         variationError = error instanceof Error ? error.message : "Could not add the variations.";
       }
@@ -147,7 +159,13 @@ export async function POST(request: Request) {
     return NextResponse.json({
       listing,
       shop,
-      variations: Boolean(variations) && !variationError,
+      // Reported off what was actually sent, so the ornament defaults — which
+      // the request itself never carries — are not shown as "no variations".
+      variations: Boolean(finalVariations) && !variationError,
+      variationCount:
+        finalVariations && !variationError
+          ? finalVariations.sizes.length * Math.max(finalVariations.colors.length, 1)
+          : 0,
       variationError,
       uploaded,
       imageError,
