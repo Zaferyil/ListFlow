@@ -263,6 +263,7 @@ export async function getProcessingProfiles(
  */
 const SIZE_PROPERTY = 513;
 const COLOR_PROPERTY = 514;
+const MATERIAL_PROPERTY = 515;
 
 /** Etsy caps a single variation at 70 values. */
 export const MAX_VARIATION_VALUES = 70;
@@ -281,6 +282,9 @@ export interface VariationInput {
   sizeLabel: string;
   sizes: SizeVariation[];
   colors: string[];
+  /** Optional 3rd property (e.g. materials for ornaments). */
+  materials?: string[];
+  materialLabel?: string;
   quantity: number;
   readinessStateId: number;
 }
@@ -315,50 +319,63 @@ export async function updateListingInventory(
 ): Promise<void> {
   const sizes = input.sizes.filter((size) => size.name.trim() && size.price > 0);
   const colors = input.colors.map((color) => color.trim()).filter(Boolean);
+  const materials = (input.materials ?? []).map((m) => m.trim()).filter(Boolean);
 
   if (sizes.length === 0) {
     throw new Error("Add at least one size before sending variations.");
   }
-  if (sizes.length > MAX_VARIATION_VALUES || colors.length > MAX_VARIATION_VALUES) {
+  if (sizes.length > MAX_VARIATION_VALUES || colors.length > MAX_VARIATION_VALUES || materials.length > MAX_VARIATION_VALUES) {
     throw new Error(`Etsy allows at most ${MAX_VARIATION_VALUES} values per variation.`);
   }
 
   // No colours means a single-axis listing rather than an empty second axis.
   const colorValues = colors.length > 0 ? colors : [null];
+  const materialValues = materials.length > 0 ? materials : [null];
   const products: InventoryProduct[] = [];
 
   for (const size of sizes) {
     for (const color of colorValues) {
-      const propertyValues = [
-        {
-          property_id: SIZE_PROPERTY,
-          property_name: input.sizeLabel.trim() || "Size",
-          value_ids: [],
-          values: [size.name.trim()],
-        },
-      ];
+      for (const material of materialValues) {
+        const propertyValues = [
+          {
+            property_id: SIZE_PROPERTY,
+            property_name: input.sizeLabel.trim() || "Size",
+            value_ids: [],
+            values: [size.name.trim()],
+          },
+        ];
 
-      if (color !== null) {
-        propertyValues.push({
-          property_id: COLOR_PROPERTY,
-          property_name: "Color",
-          value_ids: [],
-          values: [color],
+        if (color !== null) {
+          propertyValues.push({
+            property_id: COLOR_PROPERTY,
+            property_name: "Color",
+            value_ids: [],
+            values: [color],
+          });
+        }
+
+        if (material !== null) {
+          propertyValues.push({
+            property_id: MATERIAL_PROPERTY,
+            property_name: input.materialLabel || "Material",
+            value_ids: [],
+            values: [material],
+          });
+        }
+
+        products.push({
+          sku: "",
+          property_values: propertyValues,
+          offerings: [
+            {
+              price: size.price,
+              quantity: input.quantity,
+              is_enabled: true,
+              readiness_state_id: input.readinessStateId,
+            },
+          ],
         });
       }
-
-      products.push({
-        sku: "",
-        property_values: propertyValues,
-        offerings: [
-          {
-            price: size.price,
-            quantity: input.quantity,
-            is_enabled: true,
-            readiness_state_id: input.readinessStateId,
-          },
-        ],
-      });
     }
   }
 

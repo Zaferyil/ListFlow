@@ -79,18 +79,20 @@ export async function POST(request: Request) {
     let variationError: string | undefined;
     let imageError: string | undefined;
 
-    // For ornaments, automatically add standard variations
+    // For ornaments, automatically add standard variations with 3 properties
     let finalVariations = variations;
     if (product?.garment.includes("ornament") && !variations) {
       finalVariations = {
-        sizeLabel: "Shape & Print",
+        sizeLabel: "Shape",
         sizes: [
-          { name: "Heart One-Side", price: draft.price },
-          { name: "Heart Two-Sides", price: draft.price },
-          { name: "Round One-Side", price: draft.price },
-          { name: "Round Two-Sides", price: draft.price },
+          { name: "Heart", price: draft.price },
+          { name: "Round", price: draft.price },
         ],
-        colors: Array.from({ length: 12 }, (_, i) => String(i + 1)),
+        colors: ["One-Side", "Two-Sides"],
+        materials: Array.from({ length: 12 }, (_, i) => String(i + 1)),
+        materialLabel: "Quantity",
+        quantity: draft.quantity,
+        readinessStateId: draft.readinessStateId,
       };
     }
 
