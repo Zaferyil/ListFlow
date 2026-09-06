@@ -21,6 +21,8 @@ const variationsSchema = z.object({
     .array(z.object({ name: z.string().trim().min(1), price: z.number().positive() }))
     .min(1),
   colors: z.array(z.string().trim().min(1)),
+  /** Name of the second menu. Ornaments put quantity there rather than colour. */
+  colorLabel: z.string().trim().min(1).max(45).optional(),
 });
 
 const bodySchema = z.object({

@@ -140,6 +140,28 @@ const DEFAULTS: PublishSettings = {
 };
 
 /**
+ * An ornament is one listing covering both shapes and both print sides, so the
+ * first menu carries the combination — Etsy has no third slot to split them
+ * across (see etsy-api.ts). Two-sided printing costs more, which is why the
+ * prices differ per line. Editable like any other blank's size run.
+ */
+const ORNAMENT_DEFAULTS: Pick<PublishSettings, "sizeLabel" | "sizesText"> = {
+  sizeLabel: "Style",
+  sizesText: [
+    "Heart One-Side = 16.99",
+    "Heart Two-Sides = 19.99",
+    "Round One-Side = 16.99",
+    "Round Two-Sides = 19.99",
+  ].join("\n"),
+};
+
+/** The second menu on an ornament: how many the buyer wants. */
+const ORNAMENT_QUANTITY_OPTIONS = 12;
+const quantityOptions = Array.from({ length: ORNAMENT_QUANTITY_OPTIONS }, (_, index) =>
+  String(index + 1),
+);
+
+/**
  * "2XL = 26.99" per line. Etsy lets price vary on one property only, and for
  * these blanks that property is size — the same colour costs more in 2XL.
  */
@@ -170,7 +192,11 @@ function settingsKey(productId: string): string {
  * seller has not set up yet, so editing the list is never undone by a reload.
  */
 function loadSettings(productId: string, catalogColors: string): PublishSettings {
-  const fallback = { ...DEFAULTS, colorsText: catalogColors };
+  const fallback = {
+    ...DEFAULTS,
+    colorsText: catalogColors,
+    ...(findProduct(productId).garment.includes("ornament") ? ORNAMENT_DEFAULTS : {}),
+  };
   if (typeof window === "undefined") return fallback;
   try {
     const stored = window.localStorage.getItem(settingsKey(productId));
@@ -359,11 +385,18 @@ export function EtsyPanel({
           whenMade: settings.whenMade,
           productId,
           ornamentQuantity: isOrnament ? ornamentQuantity : undefined,
-          // Ornaments are left to the server's own defaults. A blank that was
-          // set up manually before keeps variationsOn in localStorage, and
-          // sending that would override the defaults with a stale size run.
-          variations:
-            settings.variationsOn && !isOrnament
+          // An ornament always varies, on the styles edited above; the second
+          // menu is quantity rather than colour. Sending nothing here would
+          // leave the server to fall back to its own built-in styles, which
+          // would quietly ignore the seller's prices.
+          variations: isOrnament
+            ? {
+                sizeLabel: settings.sizeLabel,
+                sizes: parseSizes(settings.sizesText),
+                colors: quantityOptions,
+                colorLabel: "Quantity",
+              }
+            : settings.variationsOn
               ? {
                   sizeLabel: settings.sizeLabel,
                   sizes: parseSizes(settings.sizesText),
@@ -426,7 +459,9 @@ export function EtsyPanel({
   const processingProfiles = status.processingProfiles ?? [];
   const sizeCount = parseSizes(settings.sizesText).length;
   const colorCount = parseColors(settings.colorsText).length;
-  const offeringCount = sizeCount * Math.max(colorCount, 1);
+  const offeringCount = isOrnament
+    ? sizeCount * ORNAMENT_QUANTITY_OPTIONS
+    : sizeCount * Math.max(colorCount, 1);
   // A missing decimal point turns 49.99 into 4999 and reaches Etsy silently.
   // Anything far above the rest of the run is almost certainly that typo.
   const outliers = (() => {
@@ -440,10 +475,9 @@ export function EtsyPanel({
     settings.taxonomyId !== null &&
     settings.readinessStateId !== null &&
     Number(settings.price) > 0 &&
-    // Only the manual editor can be left half-filled; the ornament defaults
-    // are built server-side and are always complete.
-    (isOrnament ||
-      !settings.variationsOn ||
+    // Both editors send variations, so both have to be filled in before Etsy
+    // will take them.
+    (!(settings.variationsOn || isOrnament) ||
       (sizeCount > 0 && settings.sizeLabel.trim().length > 0));
 
   return (
@@ -639,11 +673,45 @@ export function EtsyPanel({
       )}
 
       {isOrnament && (
-        <p className="hint" style={{ marginTop: "1rem", padding: "0.75rem", backgroundColor: "var(--color-bg-hint)" }}>
-          <strong>Ornament variations</strong> — Style (Heart One-Side, Heart Two-Sides, Round One-Side,
-          Round Two-Sides) × Quantity (1–12) are generated automatically: 48 combinations, {ornamentQuantity}{" "}
-          in stock each.
-        </p>
+        <>
+          <div className="field">
+            <label htmlFor="etsy-size-label">Name of the first menu</label>
+            <input
+              id="etsy-size-label"
+              value={settings.sizeLabel}
+              onChange={(event) => update({ sizeLabel: event.target.value })}
+              placeholder="Style"
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="etsy-sizes">Styles and prices</label>
+            <textarea
+              id="etsy-sizes"
+              rows={6}
+              value={settings.sizesText}
+              onChange={(event) => update({ sizesText: event.target.value })}
+              placeholder={"Heart One-Side = 16.99\nHeart Two-Sides = 19.99"}
+            />
+          </div>
+
+          {outliers.length > 0 && (
+            <div className="alert warn">
+              {outliers.map((size) => `${size.name} = ${size.price}`).join(", ")} —{" "}
+              {outliers.length === 1 ? "this price is" : "these prices are"} far above the rest of
+              the run. Check for a missing decimal point before sending.
+            </div>
+          )}
+
+          <p className="hint">
+            One per line, as <code>name = price</code> — rename them or change a price whenever you
+            like, and it is saved for this blank. The second menu is{" "}
+            <strong>Quantity 1–{ORNAMENT_QUANTITY_OPTIONS}</strong>, added for you.{" "}
+            {sizeCount > 0
+              ? `${offeringCount} combinations — ${sizeCount} style${sizeCount === 1 ? "" : "s"} × ${ORNAMENT_QUANTITY_OPTIONS} quantities, ${ornamentQuantity} in stock each.`
+              : "No styles recognised yet."}
+          </p>
+        </>
       )}
 
       <div className="field">
