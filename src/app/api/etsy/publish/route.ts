@@ -39,6 +39,8 @@ const bodySchema = z.object({
   variations: variationsSchema.optional(),
   /** Which blank's template photos to attach. */
   productId: z.string().trim().min(1).optional(),
+  /** For ornaments: quantity per variation (1-12). */
+  ornamentQuantity: z.number().int().min(1).max(12).optional(),
 });
 
 /** Pushes one generated listing to Etsy as a draft. Nothing is published live. */
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { variations, productId, ...draft } = parsed.data;
+    const { variations, productId, ornamentQuantity, ...draft } = parsed.data;
     const accessToken = await getAccessToken();
     const shop = await getShop(accessToken);
 
@@ -81,8 +83,10 @@ export async function POST(request: Request) {
     let imageError: string | undefined;
 
     // For ornaments, automatically add standard variations with 3 properties
+    // Use ornamentQuantity (1-12) for variation quantity, keep draft.quantity for listing stock
     let finalVariations: VariationInput | undefined;
     if (product?.garment.includes("ornament") && !variations) {
+      const qty = ornamentQuantity || 1;
       finalVariations = {
         sizeLabel: "Shape",
         sizes: [
@@ -92,7 +96,7 @@ export async function POST(request: Request) {
         colors: ["One-Side", "Two-Sides"],
         materials: Array.from({ length: 12 }, (_, i) => String(i + 1)),
         materialLabel: "Quantity",
-        quantity: draft.quantity,
+        quantity: qty,
         readinessStateId: draft.readinessStateId,
       };
     } else if (variations) {

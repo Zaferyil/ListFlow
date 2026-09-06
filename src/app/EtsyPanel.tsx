@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { Listing } from "@/lib/etsy";
+import { findProduct } from "@/lib/products";
 import { FileDrop } from "./FileDrop";
 import { FOR_ETSY, prepareForUpload } from "./shrink";
 
@@ -186,12 +187,14 @@ export function EtsyPanel({
   listing,
   productId,
   catalogColors,
+  ornamentQuantity = 1,
 }: {
   listing: Listing | null;
   productId: string;
   /** Newline-separated, so the effect below compares by value and does not
    * reset the seller's edits on every render. */
   catalogColors: string;
+  ornamentQuantity?: number;
 }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -333,6 +336,9 @@ export function EtsyPanel({
     setError(null);
     setResult(null);
     try {
+      const product = findProduct(productId);
+      const isOrnament = product.garment.includes("ornament");
+
       const response = await fetch("/api/etsy/publish", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -349,6 +355,7 @@ export function EtsyPanel({
           whoMade: settings.whoMade,
           whenMade: settings.whenMade,
           productId,
+          ornamentQuantity: isOrnament ? ornamentQuantity : undefined,
           variations: settings.variationsOn
             ? {
                 sizeLabel: settings.sizeLabel,

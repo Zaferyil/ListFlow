@@ -66,9 +66,13 @@ function Step({
 function BlankPicker({
   productId,
   onProductChange,
+  ornamentQuantity,
+  onOrnamentQuantityChange,
 }: {
   productId: string;
   onProductChange: (value: string) => void;
+  ornamentQuantity: number;
+  onOrnamentQuantityChange: (value: number) => void;
 }) {
   const product = findProduct(productId);
 
@@ -120,6 +124,22 @@ function BlankPicker({
             ))}
           </div>
 
+          {isOrnament && (
+            <div className="field" style={{ marginTop: "1rem" }}>
+              <label htmlFor="ornament-qty">Quantity per variation (1-12)</label>
+              <select
+                id="ornament-qty"
+                value={ornamentQuantity}
+                onChange={(event) => onOrnamentQuantityChange(Number(event.target.value))}
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
+                  <option key={num} value={num}>
+                    {num}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </>
       )}
 
@@ -141,7 +161,11 @@ interface TabProps {
   productId: string;
 }
 
-function DesignTab({ productId }: TabProps) {
+interface DesignTabProps extends TabProps {
+  ornamentQuantity: number;
+}
+
+function DesignTab({ productId, ornamentQuantity }: DesignTabProps) {
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<SingleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -192,13 +216,21 @@ function DesignTab({ productId }: TabProps) {
         )}
       </Step>
 
-      <EtsyStep listing={result?.listing ?? null} productId={productId} />
+      <EtsyStep listing={result?.listing ?? null} productId={productId} ornamentQuantity={ornamentQuantity} />
     </>
   );
 }
 
 /** Step 4: connecting the shop is one-time setup, so it shows before a listing exists too. */
-function EtsyStep({ listing, productId }: { listing: Listing | null; productId: string }) {
+function EtsyStep({
+  listing,
+  productId,
+  ornamentQuantity,
+}: {
+  listing: Listing | null;
+  productId: string;
+  ornamentQuantity: number;
+}) {
   return (
     <Step
       number={4}
@@ -209,12 +241,17 @@ function EtsyStep({ listing, productId }: { listing: Listing | null; productId: 
         listing={listing}
         productId={productId}
         catalogColors={(findProduct(productId).colors ?? []).join("\n")}
+        ornamentQuantity={ornamentQuantity}
       />
     </Step>
   );
 }
 
-function NicheTab({ productId }: TabProps) {
+interface NicheTabProps extends TabProps {
+  ornamentQuantity: number;
+}
+
+function NicheTab({ productId, ornamentQuantity }: NicheTabProps) {
   const [niche, setNiche] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -270,7 +307,7 @@ function NicheTab({ productId }: TabProps) {
         )}
       </Step>
 
-      <EtsyStep listing={result?.listing ?? null} productId={productId} />
+      <EtsyStep listing={result?.listing ?? null} productId={productId} ornamentQuantity={ornamentQuantity} />
     </>
   );
 }
@@ -316,7 +353,11 @@ function LayoutSummary({
   );
 }
 
-function SheetTab({ productId }: TabProps) {
+interface SheetTabProps extends TabProps {
+  ornamentQuantity: number;
+}
+
+function SheetTab({ productId, ornamentQuantity }: SheetTabProps) {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [sheetName, setSheetName] = useState("Nis Listesi");
   const [limit, setLimit] = useState(5);
@@ -524,6 +565,7 @@ const TABS: { id: Tab; label: string; short: string }[] = [
 export default function Home() {
   const [tab, setTab] = useState<Tab>("design");
   const [productId, setProductId] = useState(DEFAULT_PRODUCT_ID);
+  const [ornamentQuantity, setOrnamentQuantity] = useState(1);
 
   return (
     <>
@@ -572,12 +614,17 @@ export default function Home() {
           title="Blank"
           description="Its real fabric specs go into every listing you generate."
         >
-          <BlankPicker productId={productId} onProductChange={setProductId} />
+          <BlankPicker
+            productId={productId}
+            onProductChange={setProductId}
+            ornamentQuantity={ornamentQuantity}
+            onOrnamentQuantityChange={setOrnamentQuantity}
+          />
         </Step>
 
-        {tab === "design" && <DesignTab productId={productId} />}
-        {tab === "niche" && <NicheTab productId={productId} />}
-        {tab === "sheet" && <SheetTab productId={productId} />}
+        {tab === "design" && <DesignTab productId={productId} ornamentQuantity={ornamentQuantity} />}
+        {tab === "niche" && <NicheTab productId={productId} ornamentQuantity={ornamentQuantity} />}
+        {tab === "sheet" && <SheetTab productId={productId} ornamentQuantity={ornamentQuantity} />}
       </main>
     </>
   );
