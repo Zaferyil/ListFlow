@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  MAX_LISTING_IMAGES,
   createDraftListing,
   getShop,
   updateListingInventory,
@@ -78,7 +79,8 @@ export async function POST(request: Request) {
 
     let uploaded = 0;
     if (productId) {
-      const templates = await listTemplates(productId);
+      // In the order the seller arranged them, and never more than Etsy takes.
+      const templates = (await listTemplates(productId)).slice(0, MAX_LISTING_IMAGES);
       try {
         for (const [index, template] of templates.entries()) {
           await uploadListingImage(

@@ -3,6 +3,38 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { Listing } from "@/lib/etsy";
 import { FileDrop } from "./FileDrop";
+import { FOR_ETSY, prepareForUpload } from "./shrink";
+
+interface TemplateReply {
+  images?: TemplateImage[];
+  /** What this request wrote, which the listing may not yet reflect. */
+  saved?: TemplateImage[];
+  error?: string;
+}
+
+/** How many template photos a blank may keep. All of them go on the listing. */
+const MAX_TEMPLATES = 15;
+
+/** Keeps the arranged order, adding anything the listing has not caught up
+ *  with — a photo written a moment ago is not always in it yet. */
+function merged(listed: TemplateImage[], saved: TemplateImage[]): TemplateImage[] {
+  const known = new Set(listed.map((image) => image.name));
+  return [...listed, ...saved.filter((image) => !known.has(image.name))];
+}
+
+/**
+ * A request the platform cuts short comes back with no body at all, and
+ * response.json() then throws "Unexpected end of JSON input" — which says
+ * nothing about what went wrong. Reading it as null lets the caller report the
+ * status code instead.
+ */
+async function readJson(response: Response): Promise<TemplateReply | null> {
+  try {
+    return (await response.json()) as TemplateReply;
+  } catch {
+    return null;
+  }
+}
 
 interface ShippingProfile {
   id: number;
@@ -209,17 +241,27 @@ export function EtsyPanel({
     setUploading(true);
     setTemplateError(null);
 
-    const form = new FormData();
-    for (const file of files) form.append("images", file);
-
     try {
-      const response = await fetch(
-        `/api/etsy/templates?productId=${encodeURIComponent(productId)}`,
-        { method: "POST", body: form },
-      );
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Could not save the images.");
-      setTemplates(body.images ?? []);
+      // One photo per request: several mockups together overrun the size limit
+      // Netlify puts on a function's request body, and the failure comes back
+      // as an empty response rather than something worth showing.
+      for (const file of files) {
+        const form = new FormData();
+        form.append("images", await prepareForUpload(file, FOR_ETSY));
+
+        const response = await fetch(
+          `/api/etsy/templates?productId=${encodeURIComponent(productId)}`,
+          { method: "POST", body: form },
+        );
+
+        const body = await readJson(response);
+        if (!response.ok) {
+          throw new Error(body?.error ?? `${file.name} was not saved (${response.status}).`);
+        }
+        // Applied as each one lands, so a failure halfway still leaves the
+        // photos that did upload on screen.
+        setTemplates(merged(body?.images ?? [], body?.saved ?? []));
+      }
     } catch (caught) {
       setTemplateError(caught instanceof Error ? caught.message : "Unknown error.");
     } finally {
@@ -582,16 +624,16 @@ export function EtsyPanel({
           label={
             uploading
               ? "Uploading…"
-              : templates.length >= 10
-                ? "Ten photos already added"
+              : templates.length >= MAX_TEMPLATES
+                ? `${MAX_TEMPLATES} photos already added`
                 : "Drop your template photos here"
           }
           hint={
-            templates.length >= 10
-              ? "Remove one to add another — Etsy allows ten per listing."
-              : `or click to browse — PNG, JPEG, GIF · ${10 - templates.length} slot${10 - templates.length === 1 ? "" : "s"} left`
+            templates.length >= MAX_TEMPLATES
+              ? `Remove one to add another — this blank keeps ${MAX_TEMPLATES}.`
+              : `or click to browse — PNG, JPEG, GIF · ${MAX_TEMPLATES - templates.length} slot${MAX_TEMPLATES - templates.length === 1 ? "" : "s"} left`
           }
-          disabled={uploading || templates.length >= 10}
+          disabled={uploading || templates.length >= MAX_TEMPLATES}
           onFiles={(files) => void addTemplates(files)}
         />
         {templates.length > 0 && (
@@ -697,7 +739,7 @@ export function EtsyPanel({
         <p className="hint">
           Added to every listing for this blank — size chart, care card, colour chart. Uploaded top
           to bottom; drag a row to rearrange it. Click rows to select them, then
-          remove them together. Etsy allows 10 photos and shows the first as the search thumbnail.
+          remove them together. The top one becomes the search thumbnail on Etsy.
         </p>
       </div>
 

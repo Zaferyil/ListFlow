@@ -225,6 +225,28 @@ export const PRODUCTS: Product[] = [
     requiredKeywords: ["Comfort Colors"],
     source: "https://www.comfortcolors.com/us/en/9018-heavyweight-youth-t-shirt-en_us/",
   },
+  {
+    id: "ceramic-ornament",
+    label: "Ceramic Ornament",
+    brand: "Ceramic",
+    sku: "ceramic-ornament",
+    garment: "ceramic ornament",
+    audience: "adult",
+    composition: "100% ceramic",
+    weight: "lightweight ceramic",
+    fit: 'Available in heart (3.0") and round (2.85") shapes',
+    features: [
+      "high-quality ceramic construction",
+      "smooth gloss finish for optimal printing",
+      "1-side and 2-side printing options",
+      "white ceramic with excellent print quality",
+      "hanging loop for easy display",
+    ],
+    materials: ["ceramic", "glazed ceramic"],
+    requiredKeywords: [],
+    colors: ["White"],
+    source: "Ceramic ornament supplier",
+  },
 ];
 
 export const DEFAULT_PRODUCT_ID = PRODUCTS[0].id;

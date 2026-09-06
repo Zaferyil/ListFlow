@@ -6,7 +6,7 @@ import { DEFAULT_PRODUCT_ID, findProduct, PRODUCTS } from "@/lib/products";
 import { DropZone } from "./DropZone";
 import { EtsyPanel } from "./EtsyPanel";
 import { ListingCard } from "./ListingCard";
-import { shrinkForUpload } from "./shrink";
+import { FOR_ANALYSIS, prepareForUpload } from "./shrink";
 
 type Tab = "design" | "niche" | "sheet";
 
@@ -72,21 +72,57 @@ function BlankPicker({
 }) {
   const product = findProduct(productId);
 
+  // Separate garments from ornaments
+  const garments = PRODUCTS.filter((p) => !p.garment.includes("ornament"));
+  const ornaments = PRODUCTS.filter((p) => p.garment.includes("ornament"));
+
+  const isOrnament = product.garment.includes("ornament");
+
   return (
     <div className="card">
-      <div className="choices">
-        {PRODUCTS.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            className="choice"
-            aria-pressed={entry.id === productId}
-            onClick={() => onProductChange(entry.id)}
-          >
-            {entry.label}
-          </button>
-        ))}
-      </div>
+      {garments.length > 0 && (
+        <>
+          <p style={{ marginTop: 0, fontWeight: 600, fontSize: "0.9rem", color: "#666" }}>
+            Garments
+          </p>
+          <div className="choices">
+            {garments.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className="choice"
+                aria-pressed={entry.id === productId}
+                onClick={() => onProductChange(entry.id)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {ornaments.length > 0 && (
+        <>
+          <p style={{ marginTop: "1.5rem", marginBottom: "0.5rem", fontWeight: 600, fontSize: "0.9rem", color: "#666" }}>
+            Ornaments
+          </p>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            {ornaments.slice(0, 1).map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className="choice"
+                aria-pressed={entry.id === productId}
+                onClick={() => onProductChange(entry.id)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+
+        </>
+      )}
+
       <p className="hint">
         {product.composition} · {product.weight} · {product.fit}
         {product.colorCaveat ? ` — ${product.colorCaveat}` : ""}
@@ -120,7 +156,7 @@ function DesignTab({ productId }: TabProps) {
     try {
       const form = new FormData();
       // Sent at screen size, not print size — see shrinkForUpload.
-      form.set("design", await shrinkForUpload(file));
+      form.set("design", await prepareForUpload(file, FOR_ANALYSIS));
       form.set("productId", productId);
 
       const response = await fetch("/api/analyze", { method: "POST", body: form });

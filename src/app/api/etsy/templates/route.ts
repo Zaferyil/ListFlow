@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { MAX_LISTING_IMAGES } from "@/lib/etsy-api";
 import {
+  MAX_TEMPLATE_IMAGES,
   contentTypeFor,
   deleteTemplate,
   listTemplates,
   readTemplate,
   saveTemplate,
   setOrder,
+  type TemplateImage,
 } from "@/lib/etsy-templates";
 
 export const runtime = "nodejs";
@@ -56,10 +57,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No images were sent." }, { status: 400 });
     }
 
+    const saved: TemplateImage[] = [];
     const existing = await listTemplates(productId);
-    if (existing.length + files.length > MAX_LISTING_IMAGES) {
+    if (existing.length + files.length > MAX_TEMPLATE_IMAGES) {
       return NextResponse.json(
-        { error: `Etsy allows ${MAX_LISTING_IMAGES} photos per listing.` },
+        { error: `This blank can keep ${MAX_TEMPLATE_IMAGES} template photos.` },
         { status: 400 },
       );
     }
@@ -71,10 +73,12 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
-      await saveTemplate(productId, file.name, Buffer.from(await file.arrayBuffer()));
+      saved.push(await saveTemplate(productId, file.name, Buffer.from(await file.arrayBuffer())));
     }
 
-    return NextResponse.json({ images: await listTemplates(productId) });
+    // `saved` is what this request wrote, so the browser can show it even if
+    // the listing has not caught up with it yet.
+    return NextResponse.json({ images: await listTemplates(productId), saved });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save the images.";
     return NextResponse.json({ error: message }, { status: 400 });

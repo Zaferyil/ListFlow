@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const ACCEPTED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"];
 const ACCEPT_ATTRIBUTE = "image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.svg";
-const MAX_BYTES = 8 * 1024 * 1024;
+/**
+ * Only a guard against a file that is not really a design — a video, an
+ * archive. What reaches the server is the shrunk copy, not this, so the
+ * print-ready original can be as large as it likes.
+ */
+const MAX_BYTES = 40 * 1024 * 1024;
 
 function isAccepted(file: File): boolean {
   // Some systems report an SVG as text/xml or send no type at all, so fall back
@@ -68,7 +73,7 @@ export function DropZone({
         return;
       }
       if (candidate.size > MAX_BYTES) {
-        setRejection(`${candidate.name} is ${formatSize(candidate.size)} — the limit is 8 MB.`);
+        setRejection(`${candidate.name} is ${formatSize(candidate.size)} — the limit is 40 MB.`);
         return;
       }
 
@@ -153,7 +158,7 @@ export function DropZone({
         ) : (
           <div className="dropzone-empty">
             <strong>Drop your design here</strong>
-            <span>or click to browse — PNG, JPEG, WebP, GIF, SVG, max 8 MB</span>
+            <span>or click to browse — PNG, JPEG, WebP, GIF, SVG, max 40 MB</span>
           </div>
         )}
       </div>
