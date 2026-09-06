@@ -83,12 +83,12 @@ export async function POST(request: Request) {
     let finalVariations = variations;
     if (product?.garment.includes("ornament") && !variations) {
       finalVariations = {
-        sizeLabel: "Personalization",
+        sizeLabel: "Shape & Print",
         sizes: [
-          { name: "Heart / One-Side", price: draft.price },
-          { name: "Heart / Two-Sides", price: draft.price },
-          { name: "Round / One-Side", price: draft.price },
-          { name: "Round / Two-Sides", price: draft.price },
+          { name: "Heart One-Side", price: draft.price },
+          { name: "Heart Two-Sides", price: draft.price },
+          { name: "Round One-Side", price: draft.price },
+          { name: "Round Two-Sides", price: draft.price },
         ],
         colors: Array.from({ length: 12 }, (_, i) => String(i + 1)),
       };
