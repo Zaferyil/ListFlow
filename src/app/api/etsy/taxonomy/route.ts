@@ -44,13 +44,14 @@ export async function GET() {
     }
 
     const body = (await response.json()) as { results: TaxonomyNode[] };
-    // Include clothing, shoes, home, and any category with ornament/holiday/decor in the name
-    const relevant = body.results.filter((node) =>
-      /^(clothing|shoes|home|gifts|bath|living|party)/i.test(node.name) ||
-      /ornament|holiday|decor|seasonal/i.test(node.name),
+    // Include all top-level categories but filter the flattened results
+    // to show only relevant ones (clothing, home, ornaments, etc)
+    const flattened = flatten(body.results);
+    const relevant = flattened.filter((category) =>
+      /clothing|shoes|home|ornament|decor|seasonal|living/i.test(category.path),
     );
 
-    return NextResponse.json({ categories: flatten(relevant.length ? relevant : body.results) });
+    return NextResponse.json({ categories: relevant.length > 0 ? relevant : flattened });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load Etsy categories.";
     return NextResponse.json({ error: message }, { status: 502 });
