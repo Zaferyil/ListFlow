@@ -247,6 +247,28 @@ export const PRODUCTS: Product[] = [
     colors: ["White"],
     source: "Ceramic ornament supplier",
   },
+  {
+    id: "ceramic-round-ornament",
+    label: "Ceramic Round Ornament",
+    brand: "Ceramic",
+    sku: "round-2.85in",
+    garment: "ceramic ornament",
+    audience: "adult",
+    composition: "100% ceramic",
+    weight: "lightweight ceramic",
+    fit: '2.85" (7.24 cm) round shape',
+    features: [
+      "high-quality ceramic construction",
+      "classic round design with hanging loop",
+      "smooth gloss finish for optimal printing",
+      "1-side and 2-side printing options",
+      "white ceramic with excellent print quality",
+    ],
+    materials: ["ceramic", "glazed ceramic"],
+    requiredKeywords: [],
+    colors: ["White"],
+    source: "Ceramic ornament supplier",
+  },
 ];
 
 export const DEFAULT_PRODUCT_ID = PRODUCTS[0].id;
