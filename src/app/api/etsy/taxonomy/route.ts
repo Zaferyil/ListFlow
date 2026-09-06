@@ -44,8 +44,10 @@ export async function GET() {
     }
 
     const body = (await response.json()) as { results: TaxonomyNode[] };
+    // Include clothing, shoes, home, and any category with ornament/holiday/decor in the name
     const relevant = body.results.filter((node) =>
-      /^(clothing|shoes|home|ornament|decor)/i.test(node.name),
+      /^(clothing|shoes|home|gifts|bath|living|party)/i.test(node.name) ||
+      /ornament|holiday|decor|seasonal/i.test(node.name),
     );
 
     return NextResponse.json({ categories: flatten(relevant.length ? relevant : body.results) });
