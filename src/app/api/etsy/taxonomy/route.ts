@@ -23,8 +23,9 @@ function flatten(nodes: TaxonomyNode[], trail: string[] = []): { id: number; pat
 }
 
 /**
- * Etsy's seller taxonomy, narrowed to Clothing. This shop only sells garments,
- * and the full tree is thousands of entries — most of them noise in a picker.
+ * Etsy's seller taxonomy, filtered to include Clothing and Ornaments/Home Decor.
+ * This shop sells garments and ornaments, and the full tree is thousands of entries
+ * — most of them noise in a picker.
  */
 export async function GET() {
   if (!isEtsyConfigured()) {
@@ -43,9 +44,11 @@ export async function GET() {
     }
 
     const body = (await response.json()) as { results: TaxonomyNode[] };
-    const clothing = body.results.filter((node) => /^(clothing|shoes)/i.test(node.name));
+    const relevant = body.results.filter((node) =>
+      /^(clothing|shoes|home|ornament|decor)/i.test(node.name),
+    );
 
-    return NextResponse.json({ categories: flatten(clothing.length ? clothing : body.results) });
+    return NextResponse.json({ categories: flatten(relevant.length ? relevant : body.results) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load Etsy categories.";
     return NextResponse.json({ error: message }, { status: 502 });
