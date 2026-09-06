@@ -21,8 +21,10 @@ const variationsSchema = z.object({
     .array(z.object({ name: z.string().trim().min(1), price: z.number().positive() }))
     .min(1),
   colors: z.array(z.string().trim().min(1)),
-  /** Name of the second menu. Ornaments put quantity there rather than colour. */
+  /** Name of the second menu. Ornaments name it for the shape, not colour. */
   colorLabel: z.string().trim().min(1).max(45).optional(),
+  /** Show the priced menu second — see VariationInput.pricedMenuSecond. */
+  pricedMenuSecond: z.boolean().optional(),
 });
 
 const bodySchema = z.object({
@@ -90,11 +92,13 @@ export async function POST(request: Request) {
     let variationError: string | undefined;
     let imageError: string | undefined;
 
-    // An ornament varies on shape and print side, and on how many the buyer
-    // wants. Etsy only has two variation slots — property 515 is deprecated and
-    // rejected outright — so shape and print share the first menu and quantity
-    // takes the second. The panel normally sends its own edited styles and
-    // prices; this stands in for callers that send none.
+    // An ornament varies on shape and on print side. Etsy has two variation
+    // slots — property 515 is deprecated and rejected outright — and they go to
+    // exactly those two; quantity is left to the picker Etsy puts on every
+    // listing, which sat under ours as a second "Quantity" menu when we ran one
+    // of our own. Price follows the print side, so that menu is the priced one
+    // even though it is shown second. The panel normally sends its own edited
+    // styles and prices; this stands in for callers that send none.
     const isOrnament = Boolean(product?.garment.includes("ornament"));
     // Ornaments carry their stock per offering; everything else stocks the
     // listing as a whole and repeats that figure across its variations.
@@ -102,20 +106,15 @@ export async function POST(request: Request) {
 
     let finalVariations: VariationInput | undefined;
     if (isOrnament && !variations) {
-      const combinedSizes = ["Heart Ornament", "Round Ornament"].flatMap((shape) =>
-        ["One-Sided", "Two-Sided"].map((print) => ({
-          name: `${shape} - ${print}`,
-          price: draft.price,
-        })),
-      );
-
-      const quantities = Array.from({ length: 12 }, (_, index) => String(index + 1));
-
       finalVariations = {
-        sizeLabel: "Ornament Styles",
-        sizes: combinedSizes,
-        colors: quantities,
-        colorLabel: "Quantity",
+        sizeLabel: "Print Option",
+        sizes: [
+          { name: "One-Sided", price: draft.price },
+          { name: "Two-Sided", price: draft.price },
+        ],
+        colors: ["Heart Ornament", "Round Ornament"],
+        colorLabel: "Ornament Styles",
+        pricedMenuSecond: true,
         quantity: variationQuantity,
         readinessStateId: draft.readinessStateId,
       };

@@ -287,6 +287,12 @@ export interface VariationInput {
   colors: string[];
   /** What the second menu is called on Etsy. Defaults to "Color". */
   colorLabel?: string;
+  /**
+   * Show the priced menu second rather than first. Etsy orders the two menus
+   * by property id, so this is what decides which one the buyer meets first —
+   * an ornament leads with its shape and prices the print side underneath.
+   */
+  pricedMenuSecond?: boolean;
   quantity: number;
   readinessStateId: number;
 }
@@ -333,11 +339,16 @@ export async function updateListingInventory(
   const colorValues = colors.length > 0 ? colors : [null];
   const products: InventoryProduct[] = [];
 
+  // Whichever menu carries the prices takes the slot the seller wants shown
+  // second; the other takes the remaining one.
+  const pricedProperty = input.pricedMenuSecond ? COLOR_PROPERTY : SIZE_PROPERTY;
+  const plainProperty = input.pricedMenuSecond ? SIZE_PROPERTY : COLOR_PROPERTY;
+
   for (const size of sizes) {
     for (const color of colorValues) {
       const propertyValues = [
         {
-          property_id: SIZE_PROPERTY,
+          property_id: pricedProperty,
           property_name: input.sizeLabel.trim() || "Size",
           value_ids: [],
           values: [size.name.trim()],
@@ -346,7 +357,7 @@ export async function updateListingInventory(
 
       if (color !== null) {
         propertyValues.push({
-          property_id: COLOR_PROPERTY,
+          property_id: plainProperty,
           property_name: input.colorLabel?.trim() || "Color",
           value_ids: [],
           values: [color],
@@ -373,7 +384,7 @@ export async function updateListingInventory(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       products,
-      price_on_property: [SIZE_PROPERTY],
+      price_on_property: [pricedProperty],
       quantity_on_property: [],
       sku_on_property: [],
       readiness_state_on_property: [],

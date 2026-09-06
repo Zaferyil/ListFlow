@@ -101,8 +101,12 @@ interface PublishSettings {
   sizeLabel: string;
   /** One "size = price" per line, so a size run can be pasted or edited whole. */
   sizesText: string;
+  /** Name of the second variation menu. Ornaments name it for the shape. */
+  colorLabel: string;
   /** One colour per line. */
   colorsText: string;
+  /** Which ornament layout these values were saved under; see ORNAMENT_LAYOUT. */
+  ornamentLayout?: number;
 }
 
 const DEFAULTS: PublishSettings = {
@@ -136,30 +140,32 @@ const DEFAULTS: PublishSettings = {
     "Youth / L = 38.39",
     "Youth / XL = 38.39",
   ].join("\n"),
+  colorLabel: "Color",
   colorsText: "",
 };
 
 /**
- * An ornament is one listing covering both shapes and both print sides, so the
- * first menu carries the combination — Etsy has no third slot to split them
- * across (see etsy-api.ts). Two-sided printing costs more, which is why the
- * prices differ per line. Editable like any other blank's size run.
+ * An ornament varies on shape and on print side, which is exactly the two menus
+ * Etsy allows (see etsy-api.ts). Price follows the print side — two-sided costs
+ * more whatever the shape — so that is the priced list, shown second.
  */
-const ORNAMENT_DEFAULTS: Pick<PublishSettings, "sizeLabel" | "sizesText"> = {
-  sizeLabel: "Ornament Styles",
-  sizesText: [
-    "Heart Ornament - One-Sided = 16.99",
-    "Heart Ornament - Two-Sided = 19.99",
-    "Round Ornament - One-Sided = 16.99",
-    "Round Ornament - Two-Sided = 19.99",
-  ].join("\n"),
+const ORNAMENT_DEFAULTS: Pick<
+  PublishSettings,
+  "sizeLabel" | "sizesText" | "colorLabel" | "colorsText"
+> = {
+  colorLabel: "Ornament Styles",
+  colorsText: ["Heart Ornament", "Round Ornament"].join("\n"),
+  sizeLabel: "Print Option",
+  sizesText: ["One-Sided = 16.99", "Two-Sided = 19.99"].join("\n"),
 };
 
-/** The second menu on an ornament: how many the buyer wants. */
-const ORNAMENT_QUANTITY_OPTIONS = 12;
-const quantityOptions = Array.from({ length: ORNAMENT_QUANTITY_OPTIONS }, (_, index) =>
-  String(index + 1),
-);
+/**
+ * Bumped whenever the ornament menus change shape. A blank saved under an
+ * earlier layout holds values that mean something different now — the styles
+ * used to be one combined priced list — so it is reseeded rather than read as
+ * though it were current. Everything else the seller saved is kept.
+ */
+const ORNAMENT_LAYOUT = 2;
 
 /**
  * "2XL = 26.99" per line. Etsy lets price vary on one property only, and for
@@ -192,15 +198,24 @@ function settingsKey(productId: string): string {
  * seller has not set up yet, so editing the list is never undone by a reload.
  */
 function loadSettings(productId: string, catalogColors: string): PublishSettings {
+  const isOrnament = findProduct(productId).garment.includes("ornament");
   const fallback = {
     ...DEFAULTS,
     colorsText: catalogColors,
-    ...(findProduct(productId).garment.includes("ornament") ? ORNAMENT_DEFAULTS : {}),
+    ...(isOrnament ? ORNAMENT_DEFAULTS : {}),
   };
   if (typeof window === "undefined") return fallback;
+
   try {
     const stored = window.localStorage.getItem(settingsKey(productId));
-    return stored ? { ...fallback, ...(JSON.parse(stored) as PublishSettings) } : fallback;
+    if (!stored) return fallback;
+
+    const settings = { ...fallback, ...(JSON.parse(stored) as PublishSettings) };
+    // Category, profiles and price are still the seller's; only the menus,
+    // whose values no longer mean what they did, go back to the defaults.
+    return isOrnament && settings.ornamentLayout !== ORNAMENT_LAYOUT
+      ? { ...settings, ...ORNAMENT_DEFAULTS, ornamentLayout: ORNAMENT_LAYOUT }
+      : settings;
   } catch {
     return fallback;
   }
@@ -382,16 +397,16 @@ export function EtsyPanel({
           whoMade: settings.whoMade,
           whenMade: settings.whenMade,
           productId,
-          // An ornament always varies, on the styles edited above; the second
-          // menu is quantity rather than colour. Sending nothing here would
-          // leave the server to fall back to its own built-in styles, which
-          // would quietly ignore the seller's prices.
+          // An ornament always varies, on the two menus edited above. Sending
+          // nothing here would leave the server to fall back to its own
+          // built-in lists, which would quietly ignore the seller's prices.
           variations: isOrnament
             ? {
                 sizeLabel: settings.sizeLabel,
                 sizes: parseSizes(settings.sizesText),
-                colors: quantityOptions,
-                colorLabel: "Quantity",
+                colors: parseColors(settings.colorsText),
+                colorLabel: settings.colorLabel,
+                pricedMenuSecond: true,
               }
             : settings.variationsOn
               ? {
@@ -456,9 +471,7 @@ export function EtsyPanel({
   const processingProfiles = status.processingProfiles ?? [];
   const sizeCount = parseSizes(settings.sizesText).length;
   const colorCount = parseColors(settings.colorsText).length;
-  const offeringCount = isOrnament
-    ? sizeCount * ORNAMENT_QUANTITY_OPTIONS
-    : sizeCount * Math.max(colorCount, 1);
+  const offeringCount = sizeCount * Math.max(colorCount, 1);
   // A missing decimal point turns 49.99 into 4999 and reaches Etsy silently.
   // Anything far above the rest of the run is almost certainly that typo.
   const outliers = (() => {
@@ -671,25 +684,48 @@ export function EtsyPanel({
 
       {isOrnament && (
         <>
-          <div className="field">
-            <label htmlFor="etsy-size-label">Name of the first menu</label>
-            <input
-              id="etsy-size-label"
-              value={settings.sizeLabel}
-              onChange={(event) => update({ sizeLabel: event.target.value })}
-              placeholder="Style"
-            />
+          <div className="row">
+            <div className="field">
+              <label htmlFor="etsy-ornament-shape-label">Name of the first menu</label>
+              <input
+                id="etsy-ornament-shape-label"
+                value={settings.colorLabel}
+                onChange={(event) => update({ colorLabel: event.target.value })}
+                placeholder="Ornament Styles"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="etsy-ornament-print-label">Name of the second menu</label>
+              <input
+                id="etsy-ornament-print-label"
+                value={settings.sizeLabel}
+                onChange={(event) => update({ sizeLabel: event.target.value })}
+                placeholder="Print Option"
+              />
+            </div>
           </div>
 
-          <div className="field">
-            <label htmlFor="etsy-sizes">Styles and prices</label>
-            <textarea
-              id="etsy-sizes"
-              rows={6}
-              value={settings.sizesText}
-              onChange={(event) => update({ sizesText: event.target.value })}
-              placeholder={"Heart One-Side = 16.99\nHeart Two-Sides = 19.99"}
-            />
+          <div className="row">
+            <div className="field">
+              <label htmlFor="etsy-ornament-shapes">Styles</label>
+              <textarea
+                id="etsy-ornament-shapes"
+                rows={5}
+                value={settings.colorsText}
+                onChange={(event) => update({ colorsText: event.target.value })}
+                placeholder={"Heart Ornament\nRound Ornament"}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="etsy-ornament-prints">Print options and prices</label>
+              <textarea
+                id="etsy-ornament-prints"
+                rows={5}
+                value={settings.sizesText}
+                onChange={(event) => update({ sizesText: event.target.value })}
+                placeholder={"One-Sided = 16.99\nTwo-Sided = 19.99"}
+              />
+            </div>
           </div>
 
           {outliers.length > 0 && (
@@ -701,12 +737,13 @@ export function EtsyPanel({
           )}
 
           <p className="hint">
-            One per line, as <code>name = price</code> — rename them or change a price whenever you
-            like, and it is saved for this blank. The second menu is{" "}
-            <strong>Quantity 1–{ORNAMENT_QUANTITY_OPTIONS}</strong>, added for you.{" "}
+            One per line, and saved for this blank — rename a menu, add a style, change a price
+            whenever you like. Etsy lets price vary on one menu only, so it follows the print
+            option: a two-sided heart and a two-sided round cost the same. Buyers pick how many they
+            want with Etsy&apos;s own quantity box, so there is no menu for it here.{" "}
             {sizeCount > 0
-              ? `${offeringCount} combinations — ${sizeCount} style${sizeCount === 1 ? "" : "s"} × ${ORNAMENT_QUANTITY_OPTIONS} quantities.`
-              : "No styles recognised yet."}
+              ? `${offeringCount} combination${offeringCount === 1 ? "" : "s"} — ${colorCount} style${colorCount === 1 ? "" : "s"} × ${sizeCount} print option${sizeCount === 1 ? "" : "s"}.`
+              : "No print options recognised yet."}
           </p>
         </>
       )}
