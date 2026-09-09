@@ -6,9 +6,10 @@ import { DEFAULT_PRODUCT_ID, findProduct, isOrnament, PRODUCTS } from "@/lib/pro
 import { DropZone } from "./DropZone";
 import { EtsyPanel } from "./EtsyPanel";
 import { ListingCard } from "./ListingCard";
+import { ShopReport } from "./ShopReport";
 import { FOR_ANALYSIS, prepareForUpload } from "./shrink";
 
-type Tab = "design" | "niche" | "sheet";
+type Tab = "design" | "niche" | "sheet" | "shop";
 
 interface SingleResult {
   listing: Listing;
@@ -562,6 +563,7 @@ const TABS: { id: Tab; label: string; short: string }[] = [
   { id: "design", label: "Design analysis", short: "Design" },
   { id: "niche", label: "Single niche", short: "Niche" },
   { id: "sheet", label: "Google Sheet", short: "Sheet" },
+  { id: "shop", label: "Shop report", short: "Shop" },
 ];
 
 export default function Home() {
@@ -610,17 +612,20 @@ export default function Home() {
           ))}
         </div>
 
-        <Step
-          number={1}
-          title="Blank"
-          description="Its real fabric specs go into every listing you generate."
-        >
-          <BlankPicker productId={productId} onProductChange={setProductId} />
-        </Step>
+        {tab !== "shop" && (
+          <Step
+            number={1}
+            title="Blank"
+            description="Its real fabric specs go into every listing you generate."
+          >
+            <BlankPicker productId={productId} onProductChange={setProductId} />
+          </Step>
+        )}
 
         {tab === "design" && <DesignTab productId={productId} />}
         {tab === "niche" && <NicheTab productId={productId} />}
         {tab === "sheet" && <SheetTab productId={productId} />}
+        {tab === "shop" && <ShopReport />}
       </main>
     </>
   );

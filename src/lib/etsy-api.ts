@@ -12,8 +12,13 @@ const OAUTH_CONNECT = "https://www.etsy.com/oauth/connect";
 const OAUTH_TOKEN = "https://api.etsy.com/v3/public/oauth/token";
 const API_BASE = "https://openapi.etsy.com/v3/application";
 
-/** listings_w to create, shops_r to read the shop and its shipping profiles. */
-const SCOPES = ["listings_w", "listings_r", "shops_r"];
+/**
+ * listings_w to create, shops_r to read the shop and its shipping profiles,
+ * transactions_r to read what actually sold. A seller connected before
+ * transactions_r was asked for holds a token without it and has to reconnect —
+ * Etsy grants scopes at authorization, not per call.
+ */
+const SCOPES = ["listings_w", "listings_r", "shops_r", "transactions_r"];
 
 export function keystring(): string {
   const value = process.env.ETSY_KEYSTRING;
@@ -228,16 +233,88 @@ export async function getShopListings(
   accessToken: string,
   shopId: number,
   limit = 100,
-): Promise<{ listingId: number; title: string; tags: string[] }[]> {
+): Promise<{ listingId: number; title: string; tags: string[]; favorites: number }[]> {
   const response = await etsyFetch<{
-    results: { listing_id: number; title: string; tags?: string[] }[];
+    results: { listing_id: number; title: string; tags?: string[]; num_favorers?: number }[];
   }>(`/shops/${shopId}/listings?limit=${limit}&state=active`, accessToken);
 
   return response.results.map((entry) => ({
     listingId: entry.listing_id,
     title: entry.title,
     tags: entry.tags ?? [],
+    // Etsy exposes favourites per listing but not views: there is no view or
+    // visit count anywhere in the v3 schema, so "most looked at" cannot be
+    // answered from the API at all.
+    favorites: entry.num_favorers ?? 0,
   }));
+}
+
+/** Etsy sends money as a minor-unit amount with the divisor to apply. */
+function money(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object") {
+    const amount = (value as { amount?: number }).amount;
+    const divisor = (value as { divisor?: number }).divisor;
+    if (typeof amount === "number" && typeof divisor === "number" && divisor !== 0) {
+      return amount / divisor;
+    }
+  }
+  return 0;
+}
+
+export interface ShopSale {
+  listingId: number;
+  title: string;
+  quantity: number;
+  /** Unit price in the shop's currency. */
+  price: number;
+  currency: string;
+  /** Epoch seconds, as Etsy sends it. Zero when the order is unpaid. */
+  paidAt: number;
+}
+
+/**
+ * What the shop has actually sold, one row per line item.
+ *
+ * Paged rather than taken whole: a shop with years of orders would otherwise
+ * pull thousands of rows to answer a question about which designs sell.
+ */
+export async function getShopSales(
+  accessToken: string,
+  shopId: number,
+  max = 500,
+): Promise<ShopSale[]> {
+  const sales: ShopSale[] = [];
+  const pageSize = 100;
+
+  for (let offset = 0; offset < max; offset += pageSize) {
+    const response = await etsyFetch<{
+      count: number;
+      results: {
+        listing_id: number;
+        title: string;
+        quantity: number;
+        price?: unknown;
+        paid_timestamp?: number | null;
+      }[];
+    }>(`/shops/${shopId}/transactions?limit=${pageSize}&offset=${offset}`, accessToken);
+
+    for (const entry of response.results) {
+      sales.push({
+        listingId: entry.listing_id,
+        title: entry.title,
+        quantity: entry.quantity,
+        price: money(entry.price),
+        currency:
+          (entry.price as { currency_code?: string } | undefined)?.currency_code ?? "USD",
+        paidAt: entry.paid_timestamp ?? 0,
+      });
+    }
+
+    if (response.results.length < pageSize || sales.length >= response.count) break;
+  }
+
+  return sales;
 }
 
 export interface ProcessingProfile {
