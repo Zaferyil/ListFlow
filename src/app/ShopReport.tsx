@@ -7,6 +7,8 @@ interface Reply {
   shop?: { shopName: string };
   report?: Report;
   audit?: AuditedListing[];
+  /** Set when the sales call alone failed; the rest of the report still stands. */
+  salesError?: string;
   error?: string;
   needsReconnect?: boolean;
 }
@@ -121,6 +123,18 @@ export function ShopReport() {
           in it at all — those stay in your Etsy dashboard.
         </p>
       </div>
+
+      {reply.salesError && (
+        <div className="alert warn">
+          {reply.salesError}
+          {reply.needsReconnect && (
+            <>
+              {" "}
+              <a href="/api/etsy/connect">Reconnect to Etsy</a>
+            </>
+          )}
+        </div>
+      )}
 
       {sellers.length > 0 && (
         <section className="card">

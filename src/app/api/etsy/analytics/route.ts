@@ -19,15 +19,30 @@ export async function GET() {
   try {
     const accessToken = await getAccessToken();
     const shop = await getShop(accessToken);
-    const [listings, sales] = await Promise.all([
-      getShopListings(accessToken, shop.shopId),
-      getShopSales(accessToken, shop.shopId),
-    ]);
+    const listings = await getShopListings(accessToken, shop.shopId);
+
+    // Only the sales need transactions_r. The audit and the favourites run on
+    // listings_r, which every connection already has, so a shop that predates
+    // that scope still gets everything except the money — asking it to
+    // reconnect before it may read its own listings would be a toll for
+    // nothing.
+    let sales: Awaited<ReturnType<typeof getShopSales>> = [];
+    let salesError: string | undefined;
+    try {
+      sales = await getShopSales(accessToken, shop.shopId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      salesError = /403|scope|insufficient/i.test(message)
+        ? "Sales are missing because this app now asks for sales access and your connection predates it. Disconnect and connect again to grant it — the audit below does not need it."
+        : `Sales could not be read: ${message}`;
+    }
 
     return NextResponse.json({
       shop,
       report: buildShopReport(listings, sales),
       audit: auditListings(listings),
+      salesError,
+      needsReconnect: Boolean(salesError),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not read your shop.";
