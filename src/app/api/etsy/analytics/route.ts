@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { getShop, getShopListings, getShopSales, isEtsyConfigured } from "@/lib/etsy-api";
 import { getAccessToken } from "@/lib/etsy-tokens";
-import { buildShopReport } from "@/lib/shop-report";
+import { auditListings, buildShopReport } from "@/lib/shop-report";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-/** Favourites and sales per listing, joined into one report. */
+/**
+ * Favourites and sales per listing, plus the same SEO audit a new listing gets.
+ * One read of the shop's listings answers both, and the two belong together: a
+ * listing with no favourites and a twenty-word title has told you where to look.
+ */
 export async function GET() {
   if (!isEtsyConfigured()) {
     return NextResponse.json({ error: "Etsy is not configured." }, { status: 501 });
@@ -20,7 +24,11 @@ export async function GET() {
       getShopSales(accessToken, shop.shopId),
     ]);
 
-    return NextResponse.json({ shop, report: buildShopReport(listings, sales) });
+    return NextResponse.json({
+      shop,
+      report: buildShopReport(listings, sales),
+      audit: auditListings(listings),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not read your shop.";
 

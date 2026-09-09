@@ -233,14 +233,23 @@ export async function getShopListings(
   accessToken: string,
   shopId: number,
   limit = 100,
-): Promise<{ listingId: number; title: string; tags: string[]; favorites: number }[]> {
+): Promise<
+  { listingId: number; title: string; description: string; tags: string[]; favorites: number }[]
+> {
   const response = await etsyFetch<{
-    results: { listing_id: number; title: string; tags?: string[]; num_favorers?: number }[];
+    results: {
+      listing_id: number;
+      title: string;
+      description?: string;
+      tags?: string[];
+      num_favorers?: number;
+    }[];
   }>(`/shops/${shopId}/listings?limit=${limit}&state=active`, accessToken);
 
   return response.results.map((entry) => ({
     listingId: entry.listing_id,
     title: entry.title,
+    description: entry.description ?? "",
     tags: entry.tags ?? [],
     // Etsy exposes favourites per listing but not views: there is no view or
     // visit count anywhere in the v3 schema, so "most looked at" cannot be

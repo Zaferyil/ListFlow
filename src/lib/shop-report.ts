@@ -9,10 +9,51 @@
  * over.
  */
 
+import { inspectListing, type ListingWarning } from "./etsy";
+
 export interface ShopListingSummary {
   listingId: number;
   title: string;
   favorites: number;
+}
+
+export interface AuditedListing {
+  listingId: number;
+  title: string;
+  warnings: ListingWarning[];
+}
+
+/**
+ * Runs the live listings past the same rules a freshly generated one is held
+ * to, and reports only. Nothing here writes: a listing already earning its
+ * place is not obviously improved by a rewrite — Etsy weighs a listing's own
+ * history — so which of these to act on is the seller's call, one at a time.
+ *
+ * Required keywords are not checked. Those are a property of the blank a
+ * listing was written for, and an existing listing does not say which blank
+ * that was; flagging every one for a missing brand term would be noise.
+ */
+export function auditListings(
+  listings: { listingId: number; title: string; description: string; tags: string[] }[],
+): AuditedListing[] {
+  return listings
+    .map((listing) => ({
+      listingId: listing.listingId,
+      title: listing.title,
+      warnings: inspectListing({
+        title: listing.title,
+        description: listing.description,
+        tags: listing.tags,
+        // Not read for this audit; the checks that use them are about a listing
+        // being written, not one already live.
+        materials: [],
+        category: "",
+        attributes: "",
+        notes: "",
+      }),
+    }))
+    .filter((entry) => entry.warnings.length > 0)
+    .sort((a, b) => b.warnings.length - a.warnings.length);
 }
 
 export interface SaleLine {

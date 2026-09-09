@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ListingPerformance, ShopReport as Report } from "@/lib/shop-report";
+import type { AuditedListing, ListingPerformance, ShopReport as Report } from "@/lib/shop-report";
 
 interface Reply {
   shop?: { shopName: string };
   report?: Report;
+  audit?: AuditedListing[];
   error?: string;
   needsReconnect?: boolean;
 }
@@ -100,6 +101,7 @@ export function ShopReport() {
   }
 
   const { report } = reply;
+  const audit = reply.audit ?? [];
   const sellers = report.listings.filter((entry) => entry.unitsSold > 0);
 
   return (
@@ -139,6 +141,36 @@ export function ShopReport() {
             currency={report.currency}
             showRevenue={false}
           />
+        </section>
+      )}
+
+      {audit.length > 0 && (
+        <section className="card">
+          <h3 style={{ marginTop: 0 }}>SEO audit ({audit.length})</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Your live listings against the same rules a new one is written to, worst first. This
+            reads only — nothing is changed. Etsy weighs a listing&apos;s own history, so a listing
+            that already sells is not obviously improved by a rewrite: pick the ones to act on
+            yourself, and start with those below that earn nothing.
+          </p>
+          <ul className="report-rows audit-rows">
+            {audit.slice(0, 25).map((entry) => (
+              <li key={entry.listingId}>
+                <a
+                  href={`https://www.etsy.com/listing/${entry.listingId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {entry.title}
+                </a>
+                <ul>
+                  {entry.warnings.map((warning) => (
+                    <li key={`${warning.field}-${warning.message}`}>{warning.message}</li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
