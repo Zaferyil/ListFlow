@@ -498,9 +498,24 @@ export function EtsyPanel({
     );
   }
 
-  const visibleCategories = search.trim()
+  const searchedCategories = search.trim()
     ? categories.filter((entry) => entry.path.toLowerCase().includes(search.trim().toLowerCase()))
     : categories;
+
+  /**
+   * Etsy's taxonomy runs to a few hundred entries even filtered, so the list is
+   * capped — but a <select> whose value has no matching <option> falls back to
+   * showing the first one. Clothing sits near the top of the tree and survived
+   * the cap; Home & Living did not, so a chosen ornament category read as no
+   * category at all. The selection is always rendered, wherever it sits.
+   */
+  const chosen = categories.find((entry) => entry.id === settings.taxonomyId);
+  const listedCategories = searchedCategories.slice(0, 200);
+  const visibleCategories =
+    chosen && !listedCategories.some((entry) => entry.id === chosen.id)
+      ? [chosen, ...listedCategories]
+      : listedCategories;
+
   const processingProfiles = status.processingProfiles ?? [];
   const competitors = listing ? competingListings(listing, shopListings) : [];
   const sizeCount = parseSizes(settings.sizesText).length;
@@ -555,12 +570,22 @@ export function EtsyPanel({
           style={{ marginTop: "0.5rem" }}
         >
           <option value="">Choose a category…</option>
-          {visibleCategories.slice(0, 200).map((entry) => (
+          {visibleCategories.map((entry) => (
             <option key={entry.id} value={entry.id}>
               {entry.path}
             </option>
           ))}
         </select>
+        {/* Silence here reads as "nothing was suggested", which is the one thing
+            it does not mean — the listing did suggest a category and it found
+            no home in the picker. */}
+        {listing?.category && categories.length > 0 && !suggestedCategory && (
+          <p className="hint">
+            This listing suggests <strong>{listing.category}</strong>, which does not match a
+            category in this list. Search for it above and pick the closest one — the category also
+            decides which attributes Etsy will accept.
+          </p>
+        )}
         {suggestedCategory && settings.taxonomyId !== suggestedCategory.id && (
           <p className="hint">
             This listing suggests <strong>{suggestedCategory.path}</strong>.{" "}
