@@ -55,6 +55,8 @@ interface ProcessingProfile {
 interface Status {
   configured: boolean;
   connected: boolean;
+  /** The exact callback address Etsy must have registered for this site. */
+  callbackUrl?: string;
   shop?: { shopId: number; shopName: string };
   shippingProfiles?: ShippingProfile[];
   processingProfiles?: ProcessingProfile[];
@@ -494,6 +496,15 @@ export function EtsyPanel({
           Opens Etsy so you can authorise this app for your shop. Listings are created as drafts —
           nothing goes live until you publish it yourself.
         </p>
+        {status.callbackUrl && (
+          <p className="hint">
+            If Etsy answers <em>&quot;The requested redirect URL is not permitted&quot;</em>, this
+            address is missing from your Etsy app&apos;s callback URLs. Add it there exactly as
+            written, then try again:
+            <br />
+            <code>{status.callbackUrl}</code>
+          </p>
+        )}
       </div>
     );
   }
