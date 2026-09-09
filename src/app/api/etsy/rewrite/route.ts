@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getShop, getShopListings, updateListingText } from "@/lib/etsy-api";
+import { getListing, getShop, updateListingText } from "@/lib/etsy-api";
 import { getAccessToken } from "@/lib/etsy-tokens";
 import { inspectListing, introducedNumbers } from "@/lib/etsy";
 import { rewriteListing } from "@/lib/listing";
@@ -31,15 +31,7 @@ export async function POST(request: Request) {
     }
 
     const accessToken = await getAccessToken();
-    const shop = await getShop(accessToken);
-    const existing = (await getShopListings(accessToken, shop.shopId)).find(
-      (entry) => entry.listingId === parsed.data.listingId,
-    );
-
-    if (!existing) {
-      return NextResponse.json({ error: "That listing is not among your live listings." }, { status: 404 });
-    }
-
+    const existing = await getListing(accessToken, parsed.data.listingId);
     const proposed = await rewriteListing(existing);
     return NextResponse.json({
       existing,

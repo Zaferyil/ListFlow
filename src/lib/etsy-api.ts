@@ -251,24 +251,22 @@ export async function getShippingProfiles(
  * doubling them. Draft listings count: they are what the seller is about to
  * publish, and catching the clash before it goes live is the point.
  */
-export async function getShopListings(
-  accessToken: string,
-  shopId: number,
-  limit = 100,
-): Promise<
-  { listingId: number; title: string; description: string; tags: string[]; favorites: number }[]
-> {
-  const response = await etsyFetch<{
-    results: {
-      listing_id: number;
-      title: string;
-      description?: string;
-      tags?: string[];
-      num_favorers?: number;
-    }[];
-  }>(`/shops/${shopId}/listings?limit=${limit}&state=active`, accessToken);
+export interface ShopListingSummary {
+  listingId: number;
+  title: string;
+  description: string;
+  tags: string[];
+  favorites: number;
+}
 
-  return response.results.map((entry) => ({
+function toSummary(entry: {
+  listing_id: number;
+  title: string;
+  description?: string;
+  tags?: string[];
+  num_favorers?: number;
+}): ShopListingSummary {
+  return {
     listingId: entry.listing_id,
     title: entry.title,
     description: entry.description ?? "",
@@ -277,7 +275,63 @@ export async function getShopListings(
     // visit count anywhere in the v3 schema, so "most looked at" cannot be
     // answered from the API at all.
     favorites: entry.num_favorers ?? 0,
-  }));
+  };
+}
+
+/**
+ * Every live listing in the shop.
+ *
+ * Etsy caps a page at a hundred, and reading only the first page quietly
+ * limited the whole report to a shop's first hundred listings — the count, the
+ * audit, the never-sold list, all of it, with nothing to say a shop had more.
+ * Paged through instead, with the pacing the rate limit wants.
+ */
+export async function getShopListings(
+  accessToken: string,
+  shopId: number,
+  max = 1000,
+): Promise<ShopListingSummary[]> {
+  const listings: ShopListingSummary[] = [];
+  const pageSize = 100;
+
+  for (let offset = 0; offset < max; offset += pageSize) {
+    if (offset > 0) await sleep(250);
+
+    const response = await etsyFetch<{
+      count: number;
+      results: {
+        listing_id: number;
+        title: string;
+        description?: string;
+        tags?: string[];
+        num_favorers?: number;
+      }[];
+    }>(`/shops/${shopId}/listings?limit=${pageSize}&offset=${offset}&state=active`, accessToken);
+
+    listings.push(...response.results.map(toSummary));
+    if (response.results.length < pageSize || listings.length >= response.count) break;
+  }
+
+  return listings;
+}
+
+/**
+ * One listing on its own. Rewriting a single listing should not cost a walk
+ * through every page of the shop to find it.
+ */
+export async function getListing(
+  accessToken: string,
+  listingId: number,
+): Promise<ShopListingSummary> {
+  return toSummary(
+    await etsyFetch<{
+      listing_id: number;
+      title: string;
+      description?: string;
+      tags?: string[];
+      num_favorers?: number;
+    }>(`/listings/${listingId}`, accessToken),
+  );
 }
 
 /** Etsy sends money as a minor-unit amount with the divisor to apply. */

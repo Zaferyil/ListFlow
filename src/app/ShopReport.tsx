@@ -42,9 +42,12 @@ function ListingRows({
   currency: string;
   showRevenue?: boolean;
 }) {
+  const [limit, setLimit] = useState(10);
+
   return (
+    <>
     <ul className="report-rows">
-      {listings.map((entry) => (
+      {listings.slice(0, limit).map((entry) => (
         <li key={entry.listingId}>
           <a
             href={`https://www.etsy.com/listing/${entry.listingId}`}
@@ -63,6 +66,77 @@ function ListingRows({
         </li>
       ))}
     </ul>
+    {listings.length > limit && (
+      <button type="button" className="ghost" onClick={() => setLimit(limit + 25)}>
+        Show more — {listings.length - limit} still hidden
+      </button>
+    )}
+    </>
+  );
+}
+
+/**
+ * The audited listings, searchable and grown on request.
+ *
+ * Numbered pages would be the obvious thing and the wrong one: the list is
+ * ordered worst first, so a page number is a claim about where a listing sits
+ * in a queue the seller is working through, and paging away loses the place
+ * they had reached. Searching finds a particular listing; showing more
+ * continues down the queue.
+ */
+function AuditRows({ audit }: { audit: AuditedListing[] }) {
+  const [limit, setLimit] = useState(15);
+  const [search, setSearch] = useState("");
+
+  const term = search.trim().toLowerCase();
+  const matching = term
+    ? audit.filter((entry) => entry.title.toLowerCase().includes(term))
+    : audit;
+  const visible = matching.slice(0, limit);
+
+  return (
+    <>
+      <div className="field">
+        <label htmlFor="audit-search">Find a listing</label>
+        <input
+          id="audit-search"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setLimit(15);
+          }}
+          placeholder="Search your listings by title"
+        />
+      </div>
+
+      {matching.length === 0 && <p className="hint">No listing matches that.</p>}
+
+      <ul className="report-rows audit-rows">
+        {visible.map((entry) => (
+          <li key={entry.listingId}>
+            <a
+              href={`https://www.etsy.com/listing/${entry.listingId}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {entry.title}
+            </a>
+            <ul>
+              {entry.warnings.map((warning) => (
+                <li key={`${warning.field}-${warning.message}`}>{warning.message}</li>
+              ))}
+            </ul>
+            <RewriteListing listingId={entry.listingId} />
+          </li>
+        ))}
+      </ul>
+
+      {matching.length > limit && (
+        <button type="button" className="ghost" onClick={() => setLimit(limit + 25)}>
+          Show more — {matching.length - limit} still hidden
+        </button>
+      )}
+    </>
   );
 }
 
@@ -169,25 +243,7 @@ export function ShopReport() {
             yourself, and start with those that earn nothing. Rewriting shows both versions side by
             side and changes nothing on Etsy until you accept it.
           </p>
-          <ul className="report-rows audit-rows">
-            {audit.slice(0, 25).map((entry) => (
-              <li key={entry.listingId}>
-                <a
-                  href={`https://www.etsy.com/listing/${entry.listingId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {entry.title}
-                </a>
-                <ul>
-                  {entry.warnings.map((warning) => (
-                    <li key={`${warning.field}-${warning.message}`}>{warning.message}</li>
-                  ))}
-                </ul>
-                <RewriteListing listingId={entry.listingId} />
-              </li>
-            ))}
-          </ul>
+          <AuditRows audit={audit} />
         </section>
       )}
 
