@@ -85,6 +85,115 @@ export interface ListingWarning {
   message: string;
 }
 
+/** One entry of Etsy's seller taxonomy, as the picker holds it. */
+export interface TaxonomyChoice {
+  id: number;
+  path: string;
+}
+
+function segments(path: string): string[] {
+  return path
+    .split(">")
+    .map((part) => part.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim())
+    .filter(Boolean);
+}
+
+/**
+ * Finds the taxonomy entry a suggested category path refers to.
+ *
+ * The suggestion is written from the model's sense of Etsy's tree, so it rarely
+ * matches a real path character for character — "Ornaments & Accents" against
+ * "Ornaments", an ancestor named slightly differently. The leaf is what decides
+ * the category, so it has to line up; the ancestors above it only break ties
+ * between leaves of the same name in different branches.
+ */
+export function matchCategory(
+  suggested: string,
+  categories: TaxonomyChoice[],
+): TaxonomyChoice | null {
+  const wanted = segments(suggested);
+  if (wanted.length === 0) return null;
+
+  const wantedLeaf = wanted[wanted.length - 1];
+  let best: TaxonomyChoice | null = null;
+  let bestScore = 0;
+
+  for (const category of categories) {
+    const have = segments(category.path);
+    if (have.length === 0) continue;
+
+    const leaf = have[have.length - 1];
+    const leafScore =
+      leaf === wantedLeaf ? 100 : leaf.includes(wantedLeaf) || wantedLeaf.includes(leaf) ? 50 : 0;
+    if (leafScore === 0) continue;
+
+    const score = leafScore + have.filter((part) => wanted.includes(part)).length;
+    if (score > bestScore) {
+      best = category;
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
+/** A listing already in the shop, as far as search competition is concerned. */
+export interface ShopListing {
+  listingId: number;
+  title: string;
+  tags: string[];
+}
+
+/**
+ * The phrase a title leads on. Two words, because that is the unit a buyer
+ * types — "christmas ornament", "ghost tee" — and it is what two listings end
+ * up sharing when they compete. Reading further in finds the words that
+ * distinguish them, which is the opposite of what this looks for.
+ */
+function leadPhrase(title: string): string[] {
+  return words(title)
+    .filter((word) => !STOPWORDS.has(word))
+    .slice(0, 2);
+}
+
+/** Enough shared tags that two listings chase the same queries. */
+const SHARED_TAG_LIMIT = 5;
+
+/**
+ * Listings already in the shop that would compete with this one.
+ *
+ * Etsy shows one shop only so often for a given query, so two listings built
+ * around the same phrase do not double the shop's chances — they split them,
+ * and the weaker one drags on the pair. A shop that lists a hundred designs a
+ * month arrives here long before any single listing's wording matters.
+ */
+export function competingListings(
+  listing: Pick<Listing, "title" | "tags">,
+  existing: ShopListing[],
+): { listing: ShopListing; reason: string }[] {
+  const lead = leadPhrase(listing.title);
+  const tags = new Set(listing.tags.map((tag) => tag.toLowerCase()));
+  const competitors: { listing: ShopListing; reason: string }[] = [];
+
+  for (const other of existing) {
+    const otherLead = leadPhrase(other.title);
+    const sameLead =
+      lead.length > 0 &&
+      lead.length === otherLead.length &&
+      lead.every((word, index) => word === otherLead[index]);
+
+    const shared = other.tags.filter((tag) => tags.has(tag.toLowerCase())).length;
+
+    if (sameLead) {
+      competitors.push({ listing: other, reason: `opens with the same phrase` });
+    } else if (shared >= SHARED_TAG_LIMIT) {
+      competitors.push({ listing: other, reason: `shares ${shared} tags` });
+    }
+  }
+
+  return competitors;
+}
+
 /** Words that carry no search intent, so they don't count as opening keywords. */
 const STOPWORDS = new Set([
   "a",

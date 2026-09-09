@@ -216,6 +216,30 @@ export async function getShippingProfiles(
   }));
 }
 
+/**
+ * The shop's own listings, titles and tags only.
+ *
+ * Read so a new listing can be checked against what the shop already sells —
+ * two listings chasing one phrase split the shop's placements rather than
+ * doubling them. Draft listings count: they are what the seller is about to
+ * publish, and catching the clash before it goes live is the point.
+ */
+export async function getShopListings(
+  accessToken: string,
+  shopId: number,
+  limit = 100,
+): Promise<{ listingId: number; title: string; tags: string[] }[]> {
+  const response = await etsyFetch<{
+    results: { listing_id: number; title: string; tags?: string[] }[];
+  }>(`/shops/${shopId}/listings?limit=${limit}&state=active`, accessToken);
+
+  return response.results.map((entry) => ({
+    listingId: entry.listing_id,
+    title: entry.title,
+    tags: entry.tags ?? [],
+  }));
+}
+
 export interface ProcessingProfile {
   id: number;
   label: string;
@@ -596,7 +620,12 @@ export interface DraftListingInput {
   itemHeight?: number;
   /** Unit of dimensions: "in" or "cm" */
   dimensionsUnit?: "in" | "cm";
+  /** Set when the buyer supplies text the seller prints onto the product. */
+  personalization?: { instructions: string; required: boolean };
 }
+
+/** Etsy's ceiling on the personalization box. */
+const MAX_PERSONALIZATION_CHARS = 256;
 
 export interface CreatedListing {
   listingId: number;
@@ -631,6 +660,13 @@ export async function createDraftListing(
 
   if (input.shippingProfileId) {
     body.shipping_profile_id = input.shippingProfileId;
+  }
+
+  if (input.personalization) {
+    body.is_personalizable = true;
+    body.personalization_is_required = input.personalization.required;
+    body.personalization_char_count_max = MAX_PERSONALIZATION_CHARS;
+    body.personalization_instructions = input.personalization.instructions;
   }
 
   // Add shipping dimensions if provided (required for physical goods on some categories)

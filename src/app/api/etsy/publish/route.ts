@@ -87,6 +87,7 @@ export async function POST(request: Request) {
       itemWidth: product?.shippingDimensions?.width,
       itemHeight: product?.shippingDimensions?.height,
       dimensionsUnit: product?.dimensionsUnit,
+      personalization: product?.personalization,
     };
 
     const listing = await createDraftListing(accessToken, shop.shopId, draftWithShipping);

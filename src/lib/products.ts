@@ -53,6 +53,18 @@ export interface Product {
    * list would go straight onto a live listing.
    */
   colors?: string[];
+  /**
+   * Set when the buyer supplies text the seller prints — a name, a date, a
+   * family list. Declared per blank because it is a property of the product,
+   * not of one listing: it decides both what Etsy is told and whether the copy
+   * may promise personalization at all.
+   */
+  personalization?: {
+    /** Shown to the buyer above the box they type into. */
+    instructions: string;
+    /** Whether an order can be placed without it. */
+    required: boolean;
+  };
   source: string;
   /** Shipping weight in weight_unit (e.g., 2.5 for 2.5 oz). */
   shippingWeight?: number;
@@ -271,6 +283,11 @@ export const PRODUCTS: Product[] = [
     materials: ["ceramic", "glazed ceramic"],
     requiredKeywords: [],
     colors: ["White"],
+    personalization: {
+      instructions:
+        "Enter the name, date or short message to print on your ornament, exactly as you would like it to appear.",
+      required: false,
+    },
     source: "Ceramic ornament supplier",
     shippingWeight: 2.5,
     weightUnit: "oz",

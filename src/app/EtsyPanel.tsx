@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import type { Listing } from "@/lib/etsy";
+import {
+  competingListings,
+  matchCategory,
+  type Listing,
+  type ShopListing,
+} from "@/lib/etsy";
 import { findProduct, isOrnament as productIsOrnament } from "@/lib/products";
 import { FileDrop } from "./FileDrop";
 import { FOR_ETSY, prepareForUpload } from "./shrink";
@@ -254,6 +259,7 @@ export function EtsyPanel({
   const [uploading, setUploading] = useState(false);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [shopListings, setShopListings] = useState<ShopListing[]>([]);
 
   // The OAuth callback reports back through ?etsy=…; show it here rather than
   // leaving the seller to read it out of the address bar.
@@ -376,7 +382,30 @@ export function EtsyPanel({
       .then((response) => response.json())
       .then((body) => setCategories(body.categories ?? []))
       .catch(() => setCategories([]));
+
+    fetch("/api/etsy/listings")
+      .then((response) => response.json())
+      .then((body) => setShopListings(body.listings ?? []))
+      // The competition check is an extra; losing it must not block publishing.
+      .catch(() => setShopListings([]));
   }, [status?.connected]);
+
+  // The generated category is a path, and the picker wants an id. Matching it
+  // saves the seller hunting through a few hundred entries, and it is the
+  // taxonomy id that decides which attributes Etsy will accept below.
+  const suggestedCategory =
+    listing?.category && categories.length > 0
+      ? matchCategory(listing.category, categories)
+      : null;
+
+  useEffect(() => {
+    // Only fills an empty picker: a category the seller chose themselves is an
+    // answer, not a gap, and re-deciding it under them on every generation
+    // would undo deliberate work.
+    if (suggestedCategory && settings.taxonomyId === null) {
+      update({ taxonomyId: suggestedCategory.id });
+    }
+  }, [suggestedCategory, settings.taxonomyId, update]);
 
   async function publish() {
     if (!listing) return;
@@ -473,6 +502,7 @@ export function EtsyPanel({
     ? categories.filter((entry) => entry.path.toLowerCase().includes(search.trim().toLowerCase()))
     : categories;
   const processingProfiles = status.processingProfiles ?? [];
+  const competitors = listing ? competingListings(listing, shopListings) : [];
   const sizeCount = parseSizes(settings.sizesText).length;
   const colorCount = parseColors(settings.colorsText).length;
   const offeringCount = sizeCount * Math.max(colorCount, 1);
@@ -531,6 +561,19 @@ export function EtsyPanel({
             </option>
           ))}
         </select>
+        {suggestedCategory && settings.taxonomyId !== suggestedCategory.id && (
+          <p className="hint">
+            This listing suggests <strong>{suggestedCategory.path}</strong>.{" "}
+            <button
+              type="button"
+              className="linklike"
+              onClick={() => update({ taxonomyId: suggestedCategory.id })}
+            >
+              Use it
+            </button>{" "}
+            — the category also decides which attributes Etsy will accept.
+          </p>
+        )}
       </div>
 
       <div className="field">
@@ -883,6 +926,27 @@ export function EtsyPanel({
         If a print partner manufactures for you, Etsy expects &quot;Another company or person&quot;
         with that partner declared in your shop settings.
       </p>
+
+      {competitors.length > 0 && (
+        <div className="alert warn" style={{ marginTop: "1rem" }}>
+          <strong>
+            {competitors.length} listing{competitors.length === 1 ? "" : "s"} in your shop
+            {competitors.length === 1 ? " chases" : " chase"} the same searches:
+          </strong>
+          <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.1rem" }}>
+            {competitors.slice(0, 4).map((entry) => (
+              <li key={entry.listing.listingId}>
+                {entry.listing.title.slice(0, 70)}
+                {entry.listing.title.length > 70 ? "…" : ""} — {entry.reason}
+              </li>
+            ))}
+          </ul>
+          <p style={{ margin: "0.5rem 0 0" }}>
+            Etsy rarely shows one shop twice for a query, so these split your placements rather
+            than doubling them. Worth leading this listing with a different phrase.
+          </p>
+        </div>
+      )}
 
       <div className="actions" style={{ marginTop: "1rem" }}>
         <button className="primary" onClick={publish} disabled={!ready || busy}>

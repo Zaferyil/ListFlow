@@ -66,7 +66,6 @@ function strategyFor(product: Product): string[] {
       `This is an ornament, not apparel. Build the title from the ornament itself, the theme or occasion it is for, the design, and the material where it genuinely distinguishes the product.`,
       "A title of this shape works well: \"Personalized Family Christmas Ornament, Ceramic, Custom Names\".",
       "Never borrow apparel wording. No fit, no sizing, no sleeves, no \"tee\", and nothing about how it wears.",
-      "Only call it personalized, custom or made with the buyer's names if the product facts above actually say so. Personalization is a promise a buyer will hold you to.",
     ];
   }
 
@@ -97,7 +96,10 @@ function systemPrompt(product: Product, requiredKeywords: string[]): string {
     "",
     "PRODUCT FACTS. These are verified manufacturer specifications and they are the source of truth. You may state them, and you should, because they are what a buyer compares between listings:",
     ...productFacts(product),
-    "- Never invent anything beyond these facts: no material, no size, no colour, no production method, no care instructions, no personalization, no dimensions. If a detail is unknown, write about the design instead of guessing.",
+    "- Never invent anything beyond these facts: no material, no size, no colour, no production method, no care instructions, no dimensions. If a detail is unknown, write about the design instead of guessing.",
+    product.personalization
+      ? "- The buyer personalizes this product with their own text, so \"personalized\", \"custom name\" and similar wording is accurate here and worth putting in the title and tags — buyers search for it. Say what they can put on it, never how it is applied."
+      : "- This product is not personalized. Never call it personalized, custom, or made with the buyer's name — that is a promise the seller cannot keep on this listing.",
     "- Do not promise delivery times, processing times or refunds.",
     "",
     "TITLE.",
