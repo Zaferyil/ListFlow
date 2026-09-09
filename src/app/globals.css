@@ -989,3 +989,30 @@ button.linklike {
   color: var(--accent);
   font-weight: 550;
 }
+
+/* A listing this visit has rewritten. The findings above it still describe the
+   version it replaced, so they are dimmed rather than removed — the audit is a
+   snapshot from page load and re-running it is a reload away. */
+.audit-rows > li.updated {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.audit-rows > li.updated > ul {
+  opacity: 0.5;
+}
+
+.updated-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.75rem;
+  line-height: 1;
+  vertical-align: baseline;
+}

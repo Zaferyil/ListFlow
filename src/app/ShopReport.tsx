@@ -87,6 +87,10 @@ function ListingRows({
 function AuditRows({ audit }: { audit: AuditedListing[] }) {
   const [limit, setLimit] = useState(15);
   const [search, setSearch] = useState("");
+  // Which listings this visit has changed. The audit itself is a snapshot taken
+  // when the page loaded, so it still describes the version each rewrite
+  // replaced — the card says which of them that is now true of.
+  const [updated, setUpdated] = useState<number[]>([]);
 
   const term = search.trim().toLowerCase();
   const matching = term
@@ -112,23 +116,34 @@ function AuditRows({ audit }: { audit: AuditedListing[] }) {
       {matching.length === 0 && <p className="hint">No listing matches that.</p>}
 
       <ul className="report-rows audit-rows">
-        {visible.map((entry) => (
-          <li key={entry.listingId}>
-            <a
-              href={`https://www.etsy.com/listing/${entry.listingId}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {entry.title}
-            </a>
-            <ul>
-              {entry.warnings.map((warning) => (
-                <li key={`${warning.field}-${warning.message}`}>{warning.message}</li>
-              ))}
-            </ul>
-            <RewriteListing listingId={entry.listingId} />
-          </li>
-        ))}
+        {visible.map((entry) => {
+          const isUpdated = updated.includes(entry.listingId);
+          return (
+            <li key={entry.listingId} className={isUpdated ? "updated" : undefined}>
+              <a
+                href={`https://www.etsy.com/listing/${entry.listingId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {isUpdated && (
+                  <span className="updated-badge" aria-label="Updated">
+                    ✓
+                  </span>
+                )}
+                {entry.title}
+              </a>
+              <ul>
+                {entry.warnings.map((warning) => (
+                  <li key={`${warning.field}-${warning.message}`}>{warning.message}</li>
+                ))}
+              </ul>
+              <RewriteListing
+                listingId={entry.listingId}
+                onApplied={() => setUpdated((current) => [...current, entry.listingId])}
+              />
+            </li>
+          );
+        })}
       </ul>
 
       {matching.length > limit && (

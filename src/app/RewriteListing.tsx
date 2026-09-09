@@ -41,7 +41,14 @@ function Field({ label, before, after }: { label: string; before: string; after:
  * live listing carries whatever search history it has earned, and better
  * wording is not automatically worth trading that for.
  */
-export function RewriteListing({ listingId }: { listingId: number }) {
+export function RewriteListing({
+  listingId,
+  onApplied,
+}: {
+  listingId: number;
+  /** Told when the listing changes, so the card around it can say so. */
+  onApplied?: () => void;
+}) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [busy, setBusy] = useState(false);
   const [applied, setApplied] = useState(false);
@@ -83,6 +90,7 @@ export function RewriteListing({ listingId }: { listingId: number }) {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "The update was refused.");
       setApplied(true);
+      onApplied?.();
     } catch (caught) {
       setApplyError(caught instanceof Error ? caught.message : "Could not update the listing.");
     } finally {
@@ -91,7 +99,12 @@ export function RewriteListing({ listingId }: { listingId: number }) {
   }
 
   if (applied) {
-    return <p className="hint diff-done">Updated on Etsy. The live listing now carries this wording.</p>;
+    return (
+      <p className="hint diff-done">
+        Updated on Etsy. The live listing now carries this wording — the findings above described
+        the version it replaced.
+      </p>
+    );
   }
 
   return (
