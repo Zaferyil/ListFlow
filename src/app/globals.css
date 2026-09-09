@@ -879,9 +879,26 @@ button.linklike {
 
 /* An audited listing carries its own list of failures, so the row stacks
    instead of putting title and figures on one line. */
-.audit-rows li {
+/* An audited listing is a unit of work — findings, a rewrite, a diff, two
+   buttons — so a hairline between rows is not enough to say where one ends.
+   Each gets its own panel, and the gap does the separating. */
+.audit-rows {
+  gap: 0.75rem;
+}
+
+.audit-rows > li {
   flex-direction: column;
   align-items: stretch;
+  padding: 0.9rem 1rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* Overrides the shared row separator, which drew a line inside each panel. */
+.audit-rows > li,
+.audit-rows > li:first-child {
+  border-top: 1px solid var(--border);
 }
 
 /* The title's flex-basis is meant as a width. Once the row turns into a
@@ -951,7 +968,9 @@ button.linklike {
 .diff-pair pre {
   margin: 0;
   padding: 0.55rem;
-  background: var(--surface-sunken);
+  /* The audited listing's own panel is the sunken shade, so the two versions
+     sit above it rather than disappearing into it. */
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font: inherit;

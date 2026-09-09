@@ -214,7 +214,7 @@ export function ShopReport() {
       {sellers.length > 0 && (
         <section className="card">
           <h3 style={{ marginTop: 0 }}>Best sellers</h3>
-          <ListingRows listings={sellers.slice(0, 10)} currency={report.currency} />
+          <ListingRows listings={sellers} currency={report.currency} />
         </section>
       )}
 
@@ -226,7 +226,7 @@ export function ShopReport() {
             something after that — price, photos, shipping cost — is losing them.
           </p>
           <ListingRows
-            listings={report.favoritedNeverSold.slice(0, 10)}
+            listings={report.favoritedNeverSold}
             currency={report.currency}
             showRevenue={false}
           />
@@ -257,7 +257,7 @@ export function ShopReport() {
             category — rather than at the design.
           </p>
           <ListingRows
-            listings={report.unnoticed.slice(0, 10)}
+            listings={report.unnoticed}
             currency={report.currency}
             showRevenue={false}
           />
