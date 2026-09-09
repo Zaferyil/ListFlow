@@ -113,6 +113,44 @@ function strategyFor(product: Product): string[] {
   ];
 }
 
+/**
+ * The rules a listing is written to, whichever way it reaches us. A fresh
+ * listing and a rewrite of a live one are judged the same, so they are stated
+ * once — the only difference is what is known about the product, which is the
+ * caller's business.
+ */
+function writingRules(strategy: string[]): string[] {
+  return [
+    "TITLE.",
+    `- At most ${ETSY_LIMITS.titleMaxChars} characters, but length is not a target — aim for under 15 words. A shorter title that reads clearly beats a longer one padded with keywords.`,
+    "- A buyer must know what the product is from the first few words. Lead with the product type and its strongest identifying trait, then add the theme, style or material.",
+    "- It has to read like a title a real seller wrote for a human. Never a chain of comma-separated keywords.",
+    '- Never repeat a word or phrase to gain ranking. "Halloween Shirt Halloween T Shirt Halloween Gift Spooky Shirt" is exactly what to avoid.',
+    "- Banned outright: SALE, ON SALE, FREE SHIPPING, BEST SELLER, PERFECT GIFT, BEST GIFT, AMAZING, BEAUTIFUL, MUST HAVE, CHEAP, BEST, #1, and any other promotional wording.",
+    "- Do not add a recipient or an occasion just to fill the title. Include one only when it genuinely identifies the product.",
+    "",
+    ...(strategy.length > 0 ? ["PRODUCT STRATEGY.", ...strategy.map((line) => `- ${line}`), ""] : []),
+    `TAGS. Exactly ${ETSY_LIMITS.maxTags}, each at most ${ETSY_LIMITS.tagMaxChars} characters.`,
+    "- Each tag is a separate search opportunity. Spend them across different kinds of search: the core product type, the design or theme, the style, the audience, the occasion or use, the material, and a longer specific phrase or two.",
+    "- Multi-word phrases beat single words. Ask of each one: would a real buyer type this into Etsy? If not, drop it.",
+    "- Do not write thirteen versions of one phrase. Near-duplicates compete with each other instead of reaching a new query.",
+    "- No deliberate misspellings, no unrelated trending terms, no second language, and no trademark or celebrity terms unless the product facts genuinely support them.",
+    "- Do not spend a tag restating what the category or an attribute already tells Etsy, unless it is also a phrase buyers really search.",
+    "",
+    "DESCRIPTION.",
+    "- Write for a human buyer first, carrying the important phrases naturally as you go.",
+    "- The opening sentences make clear what the product is, what the design shows, and the one thing that sets it apart.",
+    "- Do not repeat the title word for word, and never write a keyword list dressed up as a paragraph.",
+    "- Use short labelled sections where they apply — PRODUCT DETAILS, MATERIAL, SIZING, CARE INSTRUCTIONS, WHAT YOU'LL RECEIVE — and include only the ones you actually have facts for.",
+    "",
+    "CATEGORY AND ATTRIBUTES.",
+    "- Give the most specific accurate Etsy category for this actual product. Never a broad one where a specific one exists, and never pick for search volume over accuracy.",
+    "- Give the Etsy attributes that exist for that category and that the product facts support. Attributes are structured data, not another place to put keywords.",
+    "",
+    "Etsy reads the whole listing, so distribute rather than repeat: the title carries the product and its strongest traits, the tags reach the searches the title cannot, attributes carry the structured facts, and the description gives the context.",
+  ];
+}
+
 function systemPrompt(product: Product, requiredKeywords: string[]): string {
   const noun = product.garment;
 
@@ -133,35 +171,7 @@ function systemPrompt(product: Product, requiredKeywords: string[]): string {
       : "- This product is not personalized. Never call it personalized, custom, or made with the buyer's name — that is a promise the seller cannot keep on this listing.",
     "- Do not promise delivery times, processing times or refunds.",
     "",
-    "TITLE.",
-    `- At most ${ETSY_LIMITS.titleMaxChars} characters, but length is not a target — aim for under 15 words. A shorter title that reads clearly beats a longer one padded with keywords.`,
-    "- A buyer must know what the product is from the first few words. Lead with the product type and its strongest identifying trait, then add the theme, style or material.",
-    "- It has to read like a title a real seller wrote for a human. Never a chain of comma-separated keywords.",
-    '- Never repeat a word or phrase to gain ranking. "Halloween Shirt Halloween T Shirt Halloween Gift Spooky Shirt" is exactly what to avoid.',
-    "- Banned outright: SALE, ON SALE, FREE SHIPPING, BEST SELLER, PERFECT GIFT, BEST GIFT, AMAZING, BEAUTIFUL, MUST HAVE, CHEAP, BEST, #1, and any other promotional wording.",
-    "- Do not add a recipient or an occasion just to fill the title. Include one only when it genuinely identifies the product.",
-    "",
-    "PRODUCT STRATEGY.",
-    ...strategyFor(product).map((line) => `- ${line}`),
-    "",
-    `TAGS. Exactly ${ETSY_LIMITS.maxTags}, each at most ${ETSY_LIMITS.tagMaxChars} characters.`,
-    "- Each tag is a separate search opportunity. Spend them across different kinds of search: the core product type, the design or theme, the style, the audience, the occasion or use, the material, and a longer specific phrase or two.",
-    "- Multi-word phrases beat single words. Ask of each one: would a real buyer type this into Etsy? If not, drop it.",
-    "- Do not write thirteen versions of one phrase. Near-duplicates compete with each other instead of reaching a new query.",
-    "- No deliberate misspellings, no unrelated trending terms, no second language, and no trademark or celebrity terms unless the product facts genuinely support them.",
-    "- Do not spend a tag restating what the category or an attribute already tells Etsy, unless it is also a phrase buyers really search.",
-    "",
-    "DESCRIPTION.",
-    "- Write for a human buyer first, carrying the important phrases naturally as you go.",
-    "- The opening sentences make clear what the product is, what the design shows, and the one thing that sets it apart.",
-    "- Do not repeat the title word for word, and never write a keyword list dressed up as a paragraph.",
-    "- Use short labelled sections where they apply — PRODUCT DETAILS, MATERIAL, SIZING, CARE INSTRUCTIONS, WHAT YOU'LL RECEIVE — and include only the ones you actually have facts for.",
-    "",
-    "CATEGORY AND ATTRIBUTES.",
-    "- Give the most specific accurate Etsy category for this actual product. Never a broad one where a specific one exists, and never pick for search volume over accuracy.",
-    "- Give the Etsy attributes that exist for that category and that the product facts support. Attributes are structured data, not another place to put keywords.",
-    "",
-    "Etsy reads the whole listing, so distribute rather than repeat: the title carries the product and its strongest traits, the tags reach the searches the title cannot, attributes carry the structured facts, and the description gives the context.",
+    ...writingRules(strategyFor(product)),
   ];
 
   if (requiredKeywords.length > 0) {
@@ -316,4 +326,75 @@ export function generateFromDesign(
     ],
     options,
   );
+}
+
+export interface ExistingListing {
+  title: string;
+  description: string;
+  tags: string[];
+}
+
+/**
+ * Rewrites a listing already live in the shop.
+ *
+ * Nothing here knows which blank the listing was written for — an Etsy listing
+ * does not record that — so the catalogue's verified specifications, the thing
+ * the generator normally leans on, are simply absent. The listing's own copy is
+ * the only account of the product there is, and it is treated as fact: the
+ * rewrite may reorganise and reword, and may not introduce a claim the seller
+ * never made.
+ */
+export async function rewriteListing(existing: ExistingListing): Promise<Listing> {
+  const system = [
+    "You are an Etsy listing specialist. You optimize for Etsy search as it works now, not for the keyword-stuffing tactics that used to work.",
+    "You write for the US Etsy market: American English spelling and phrasing a US buyer would use.",
+    "",
+    "You are rewriting a listing that is already live. The seller wrote it, and it is the only account of the product you have.",
+    "- Every factual claim in your version must be traceable to the listing you were given: the same product, material, sizing, colours, personalization and production method.",
+    "- You may reorganise, reword, cut what is repeated and sharpen what is vague. You may not add a fact the seller did not state, and you may not drop one that helps a buyer decide.",
+    "- If the existing copy is thin, write less rather than inventing more.",
+    "- Never turn it into a digital download, printable, clipart or cut file, and keep file formats out of the title and tags.",
+    "- Do not promise delivery times, processing times or refunds.",
+    "",
+    ...writingRules([]),
+    "",
+    "In the notes, say what you changed and why, so the seller can judge the rewrite against the listing that is earning today.",
+  ].join("\n");
+
+  const response = await getClient().chat.completions.create({
+    model: MODEL,
+    max_completion_tokens: 4000,
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: "etsy_listing", strict: true, schema: LISTING_SCHEMA },
+    },
+    messages: [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content: [
+          "Rewrite this listing.",
+          "",
+          `TITLE: ${existing.title}`,
+          "",
+          `TAGS: ${existing.tags.join(", ") || "(none)"}`,
+          "",
+          "DESCRIPTION:",
+          existing.description || "(empty)",
+        ].join("\n"),
+      },
+    ],
+  });
+
+  const message = response.choices[0]?.message;
+  if (message?.refusal) throw new Error(`The model refused this request: ${message.refusal}`);
+  if (response.choices[0]?.finish_reason === "length") {
+    throw new Error("The response hit the token limit. Try again.");
+  }
+  if (!message?.content) throw new Error("The model returned an empty response. Try again.");
+
+  const generated = JSON.parse(message.content) as Omit<Listing, "materials">;
+  // Materials are left exactly as the seller has them: they are a factual claim
+  // about the product, and nothing here is in a position to revise one.
+  return normalizeListing({ ...generated, materials: [] });
 }

@@ -817,6 +817,30 @@ export async function createDraftListing(
   };
 }
 
+/**
+ * Rewrites the words on a listing that is already live.
+ *
+ * Title, description and tags only. Category, price, variations and photos are
+ * left alone: this exists to fix wording, and every field it does not send is
+ * one it cannot break.
+ */
+export async function updateListingText(
+  accessToken: string,
+  shopId: number,
+  listingId: number,
+  text: { title: string; description: string; tags: string[] },
+): Promise<void> {
+  await etsyFetch(`/shops/${shopId}/listings/${listingId}`, accessToken, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      title: text.title,
+      description: stripEmoji(text.description),
+      tags: text.tags,
+    }),
+  });
+}
+
 /** Etsy's ceiling on listing photos. */
 export const MAX_LISTING_IMAGES = 20;
 

@@ -897,3 +897,69 @@ button.linklike {
   display: list-item;
   white-space: normal;
 }
+
+/* Rewrite proposal ------------------------------------------------------- */
+
+.rewrite {
+  margin-top: 0.6rem;
+}
+
+.diff-field {
+  margin-top: 0.9rem;
+}
+
+.diff-field h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+}
+
+.diff-same {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Stacked on a phone, side by side once the two columns can be read at
+   once — a diff squeezed into half a narrow screen is worse than no diff. */
+.diff-pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+@media (min-width: 760px) {
+  .diff-pair {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.diff-label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+.diff-pair pre {
+  margin: 0;
+  padding: 0.55rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-pair .diff-new {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.diff-done {
+  color: var(--accent);
+  font-weight: 550;
+}

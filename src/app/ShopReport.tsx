@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AuditedListing, ListingPerformance, ShopReport as Report } from "@/lib/shop-report";
+import { RewriteListing } from "./RewriteListing";
 
 interface Reply {
   shop?: { shopName: string };
@@ -165,7 +166,8 @@ export function ShopReport() {
             Your live listings against the same rules a new one is written to, worst first. This
             reads only — nothing is changed. Etsy weighs a listing&apos;s own history, so a listing
             that already sells is not obviously improved by a rewrite: pick the ones to act on
-            yourself, and start with those below that earn nothing.
+            yourself, and start with those that earn nothing. Rewriting shows both versions side by
+            side and changes nothing on Etsy until you accept it.
           </p>
           <ul className="report-rows audit-rows">
             {audit.slice(0, 25).map((entry) => (
@@ -182,6 +184,7 @@ export function ShopReport() {
                     <li key={`${warning.field}-${warning.message}`}>{warning.message}</li>
                   ))}
                 </ul>
+                <RewriteListing listingId={entry.listingId} />
               </li>
             ))}
           </ul>
