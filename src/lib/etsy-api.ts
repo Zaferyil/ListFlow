@@ -255,6 +255,147 @@ export async function getProcessingProfiles(
 }
 
 /**
+ * One of the structured fields a category offers — "Holiday", "Occasion",
+ * "Room" — together with the values Etsy will accept for it.
+ */
+export interface TaxonomyProperty {
+  id: number;
+  /** Etsy's own name, e.g. "holiday". */
+  name: string;
+  /** What a seller sees in the listing form, e.g. "Holiday". */
+  displayName: string;
+  values: { id: number; name: string; scaleId?: number }[];
+}
+
+/**
+ * The attributes available on a category.
+ *
+ * Attributes are not free text: each one is a numbered property whose values
+ * are themselves numbered, and both sets differ per category. Sending a name
+ * where Etsy expects an id is rejected, so anything we set has to be looked up
+ * here first.
+ */
+export async function getTaxonomyProperties(
+  accessToken: string,
+  taxonomyId: number,
+): Promise<TaxonomyProperty[]> {
+  const response = await etsyFetch<{
+    results: {
+      property_id: number;
+      name: string;
+      display_name: string;
+      supports_attributes: boolean;
+      possible_values?: { value_id: number; name: string; scale_id?: number | null }[];
+    }[];
+  }>(`/seller-taxonomy/nodes/${taxonomyId}/properties`, accessToken);
+
+  return response.results
+    // Some properties exist only to drive variations; those are not attributes
+    // and setting one here would collide with the size/colour menus.
+    .filter((property) => property.supports_attributes)
+    .map((property) => ({
+      id: property.property_id,
+      name: property.name,
+      displayName: property.display_name || property.name,
+      values: (property.possible_values ?? []).map((value) => ({
+        id: value.value_id,
+        name: value.name,
+        scaleId: value.scale_id ?? undefined,
+      })),
+    }));
+}
+
+export interface AttributeMatch {
+  propertyId: number;
+  valueIds: number[];
+  values: string[];
+  scaleId?: number;
+}
+
+/** Ignores case, punctuation and spacing so "Two-Sided" matches "two sided". */
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Turns generated "Holiday: Christmas" lines into the ids Etsy accepts.
+ *
+ * Anything without an exact match — a property this category does not offer, a
+ * value Etsy does not list for it — is dropped rather than guessed at. A
+ * listing missing an attribute simply ranks on the rest; a listing carrying an
+ * invented one is wrong about the product, and attributes are the part of a
+ * listing buyers filter on.
+ */
+export function matchAttributes(text: string, properties: TaxonomyProperty[]): AttributeMatch[] {
+  const matches: AttributeMatch[] = [];
+  const claimed = new Set<number>();
+
+  for (const line of text.split("\n")) {
+    const separator = line.indexOf(":");
+    if (separator === -1) continue;
+
+    const wanted = normalize(line.slice(0, separator));
+    const property = properties.find(
+      (entry) => normalize(entry.displayName) === wanted || normalize(entry.name) === wanted,
+    );
+    // One line per property; a repeat is the model restating itself.
+    if (!property || claimed.has(property.id)) continue;
+
+    const valueIds: number[] = [];
+    const values: string[] = [];
+    let scaleId: number | undefined;
+
+    for (const candidate of line.slice(separator + 1).split(",")) {
+      const wantedValue = normalize(candidate);
+      if (!wantedValue) continue;
+
+      const value = property.values.find((entry) => normalize(entry.name) === wantedValue);
+      if (!value) continue;
+
+      valueIds.push(value.id);
+      values.push(value.name);
+      scaleId ??= value.scaleId;
+    }
+
+    if (valueIds.length === 0) continue;
+
+    claimed.add(property.id);
+    matches.push({ propertyId: property.id, valueIds, values, scaleId });
+  }
+
+  return matches;
+}
+
+/** Sets one attribute on a listing. */
+export async function updateListingProperty(
+  accessToken: string,
+  shopId: number,
+  listingId: number,
+  attribute: AttributeMatch,
+): Promise<void> {
+  const body: Record<string, unknown> = {
+    value_ids: attribute.valueIds,
+    values: attribute.values,
+  };
+  if (attribute.scaleId !== undefined) {
+    body.scale_id = attribute.scaleId;
+  }
+
+  await etsyFetch(
+    `/shops/${shopId}/listings/${listingId}/properties/${attribute.propertyId}`,
+    accessToken,
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+/**
  * Etsy's two custom variation slots. Print-on-demand colourways ("Blue Jean",
  * "Pepper", "Sand") are not in Etsy's fixed colour list, and blank size runs
  * vary by garment, so free text on the custom properties fits this shop where

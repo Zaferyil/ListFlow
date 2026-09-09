@@ -4,7 +4,10 @@ import {
   MAX_LISTING_IMAGES,
   createDraftListing,
   getShop,
+  getTaxonomyProperties,
+  matchAttributes,
   updateListingInventory,
+  updateListingProperty,
   uploadListingImage,
   type VariationInput,
 } from "@/lib/etsy-api";
@@ -43,6 +46,8 @@ const bodySchema = z.object({
   variations: variationsSchema.optional(),
   /** Which blank's template photos to attach. */
   productId: z.string().trim().min(1).optional(),
+  /** Suggested Etsy attributes as "Holiday: Christmas" lines, one per line. */
+  attributes: z.string().trim().max(2000).optional(),
 });
 
 /**
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { variations, productId, ...draft } = parsed.data;
+    const { variations, productId, attributes, ...draft } = parsed.data;
     const accessToken = await getAccessToken();
     const shop = await getShop(accessToken);
 
@@ -91,6 +96,8 @@ export async function POST(request: Request) {
     // with an orphan they never hear about.
     let variationError: string | undefined;
     let imageError: string | undefined;
+    let attributeError: string | undefined;
+    let attributesSet = 0;
 
     // An ornament varies on shape and on print side. Etsy has two variation
     // slots — property 515 is deprecated and rejected outright — and they go to
@@ -135,6 +142,26 @@ export async function POST(request: Request) {
       }
     }
 
+    // Attributes are what Etsy's own filters run on — a shopper narrowing to
+    // Christmas ornaments is reading these, not the tags — so they are worth
+    // setting even though nothing fails without them.
+    if (attributes) {
+      try {
+        const matched = matchAttributes(
+          attributes,
+          await getTaxonomyProperties(accessToken, draft.taxonomyId),
+        );
+
+        for (const attribute of matched) {
+          await updateListingProperty(accessToken, shop.shopId, listing.listingId, attribute);
+          attributesSet += 1;
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "the request failed";
+        attributeError = `${attributesSet} attribute${attributesSet === 1 ? "" : "s"} set — ${reason}`;
+      }
+    }
+
     let uploaded = 0;
     if (productId) {
       // In the order the seller arranged them, and never more than Etsy takes.
@@ -171,6 +198,8 @@ export async function POST(request: Request) {
           ? finalVariations.sizes.length * Math.max(finalVariations.colors.length, 1)
           : 0,
       variationError,
+      attributesSet,
+      attributeError,
       uploaded,
       imageError,
     });

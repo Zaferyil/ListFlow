@@ -68,6 +68,9 @@ interface PublishResult {
    *  cover the ornament defaults, which are built server-side. */
   variationCount?: number;
   variationError?: string;
+  /** How many Etsy attributes were matched to real ids and set. */
+  attributesSet?: number;
+  attributeError?: string;
   uploaded?: number;
   imageError?: string;
 }
@@ -389,6 +392,7 @@ export function EtsyPanel({
           description: listing.description,
           tags: listing.tags,
           materials: listing.materials,
+          attributes: listing.attributes || undefined,
           taxonomyId: settings.taxonomyId,
           shippingProfileId: settings.shippingProfileId ?? undefined,
           readinessStateId: settings.readinessStateId,
@@ -899,6 +903,7 @@ export function EtsyPanel({
           <div className="alert info" style={{ marginTop: "1rem" }}>
             Draft created
             {result.variations ? ` with ${result.variationCount ?? offeringCount} variations` : ""}
+            {result.attributesSet ? `, ${result.attributesSet} attributes` : ""}
             {result.uploaded ? ` and ${result.uploaded} photos` : ""}.{" "}
             <a href={result.listing.url} target="_blank" rel="noreferrer">
               Open listing {result.listing.listingId} on Etsy
@@ -908,6 +913,11 @@ export function EtsyPanel({
           {result.variationError && (
             <div className="alert warn">
               The draft was created but the variations were not added: {result.variationError}
+            </div>
+          )}
+          {result.attributeError && (
+            <div className="alert warn">
+              Some attributes were not set: {result.attributeError}
             </div>
           )}
           {result.imageError && <div className="alert warn">{result.imageError}</div>}
