@@ -139,8 +139,40 @@ interface TabProps {
   productId: string;
 }
 
+/**
+ * The seller's own steer on what this listing should rank for. They know their
+ * shop's queries better than the model can infer from one design — but a phrase
+ * that does not describe the product is left out rather than forced in, and the
+ * strategy note says which were used.
+ */
+function TargetKeywords({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <div className="field">
+      <label htmlFor="target-keywords">Target searches (optional)</label>
+      <textarea
+        id="target-keywords"
+        rows={3}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={"lake house christmas decor\npersonalized cottage ornament\n\nOr paste a listing title you want to compete with."}
+      />
+      <p className="hint">
+        One per line. These are used where they genuinely describe the product and left out where
+        they do not — the strategy note says which.
+      </p>
+    </div>
+  );
+}
+
 function DesignTab({ productId }: TabProps) {
   const [file, setFile] = useState<File | null>(null);
+  const [targetKeywords, setTargetKeywords] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -156,6 +188,7 @@ function DesignTab({ productId }: TabProps) {
       // Sent at screen size, not print size — see shrinkForUpload.
       form.set("design", await prepareForUpload(file, FOR_ANALYSIS));
       form.set("productId", productId);
+      form.set("targetKeywords", targetKeywords);
 
       const response = await fetch("/api/analyze", { method: "POST", body: form });
       if (!response.ok) throw new Error(await errorFrom(response));
@@ -177,6 +210,7 @@ function DesignTab({ productId }: TabProps) {
 
       <Step number={3} title="Generate" description="Title, description and 13 tags, ready to paste.">
         <div className="card">
+          <TargetKeywords value={targetKeywords} onChange={setTargetKeywords} />
           <button className="primary" onClick={submit} disabled={!file || loading}>
             {loading ? "Analyzing…" : "Generate listing"}
           </button>
@@ -214,6 +248,7 @@ function EtsyStep({ listing, productId }: { listing: Listing | null; productId: 
 
 function NicheTab({ productId }: TabProps) {
   const [niche, setNiche] = useState("");
+  const [targetKeywords, setTargetKeywords] = useState("");
   const [result, setResult] = useState<SingleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -226,7 +261,7 @@ function NicheTab({ productId }: TabProps) {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ niche, productId }),
+        body: JSON.stringify({ niche, productId, targetKeywords: targetKeywords || undefined }),
       });
       if (!response.ok) throw new Error(await errorFrom(response));
       setResult(await response.json());
@@ -255,6 +290,7 @@ function NicheTab({ productId }: TabProps) {
 
       <Step number={3} title="Generate" description="Title, description and 13 tags, ready to paste.">
         <div className="card">
+          <TargetKeywords value={targetKeywords} onChange={setTargetKeywords} />
           <button className="primary" onClick={submit} disabled={niche.trim().length < 2 || loading}>
             {loading ? "Generating…" : "Generate listing"}
           </button>
@@ -316,6 +352,7 @@ function LayoutSummary({
 
 function SheetTab({ productId }: TabProps) {
   const [spreadsheetId, setSpreadsheetId] = useState("");
+  const [targetKeywords, setTargetKeywords] = useState("");
   const [sheetName, setSheetName] = useState("Nis Listesi");
   const [limit, setLimit] = useState(5);
   const [writeBack, setWriteBack] = useState(true);
@@ -371,7 +408,14 @@ function SheetTab({ productId }: TabProps) {
         const response = await fetch("/api/sheets", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ spreadsheetId, sheetName, limit: 1, writeBack, productId }),
+          body: JSON.stringify({
+            spreadsheetId,
+            sheetName,
+            limit: 1,
+            writeBack,
+            productId,
+            targetKeywords: targetKeywords || undefined,
+          }),
         });
 
         // 404 is "nothing left marked New", which is the normal way to finish.
@@ -474,6 +518,7 @@ function SheetTab({ productId }: TabProps) {
         description="Check the column mapping first, then run the batch."
       >
         <div className="card">
+          <TargetKeywords value={targetKeywords} onChange={setTargetKeywords} />
           <div className="actions">
             <button className="ghost" onClick={preview} disabled={!spreadsheetId || loading}>
               Check sheet

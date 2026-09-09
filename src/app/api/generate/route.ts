@@ -10,6 +10,8 @@ export const maxDuration = 120;
 const bodySchema = z.object({
   niche: z.string().trim().min(2, "Niche is too short.").max(500),
   productId: z.string().trim().optional(),
+  /** Phrases the seller wants this listing to reach. */
+  targetKeywords: z.string().trim().max(1000).optional(),
 });
 
 export async function POST(request: Request) {
@@ -19,8 +21,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { niche, productId } = parsed.data;
-    const listing = await generateFromNiche(niche, { productId });
+    const { niche, productId, targetKeywords } = parsed.data;
+    const listing = await generateFromNiche(niche, { productId, targetKeywords });
 
     return NextResponse.json({ listing, warnings: inspectListing(listing, requiredKeywordsFor(productId)) });
   } catch (error) {

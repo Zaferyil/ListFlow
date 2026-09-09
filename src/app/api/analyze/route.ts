@@ -78,8 +78,9 @@ export async function POST(request: Request) {
     }
 
     const productId = String(form.get("productId") ?? "") || undefined;
+    const targetKeywords = String(form.get("targetKeywords") ?? "").slice(0, 1000) || undefined;
 
-    const listing = await generateFromDesign(design, { productId });
+    const listing = await generateFromDesign(design, { productId, targetKeywords });
 
     return NextResponse.json({
       listing,

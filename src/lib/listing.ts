@@ -20,6 +20,37 @@ type UserContent = OpenAI.Chat.Completions.ChatCompletionContentPart;
 export interface GenerateOptions {
   /** Which blank the design is printed on. Defaults to the first in the catalog. */
   productId?: string;
+  /**
+   * Phrases the seller wants this listing to reach, or competitor titles to
+   * take a steer from. Free text — whatever they pasted in.
+   */
+  targetKeywords?: string;
+}
+
+/**
+ * The seller's own steer, as a prompt block.
+ *
+ * They know their shop's queries better than the model can infer from one
+ * design, but a phrase that does not describe the product is the outdated
+ * tactic this prompt spends its length avoiding — so the steer is applied where
+ * it fits and reported where it does not, rather than obeyed blindly.
+ */
+function targetBlock(targetKeywords: string | undefined): UserContent[] {
+  const wanted = targetKeywords?.trim();
+  if (!wanted) return [];
+
+  return [
+    {
+      type: "text",
+      text: [
+        "The seller is targeting these searches, or has pasted listings they want to compete with:",
+        "",
+        wanted,
+        "",
+        "Build the listing around whichever of these genuinely describe this product — in the title where one fits naturally, otherwise in the tags. Ignore any that do not describe it: a phrase that brings the wrong buyer costs more than the traffic it adds. Say in the notes which you used and which you left out, and why.",
+      ].join("\n"),
+    },
+  ];
 }
 
 const LISTING_SCHEMA = {
@@ -241,7 +272,10 @@ export function generateFromNiche(niche: string, options: GenerateOptions = {}):
   const product = findProduct(options.productId ?? DEFAULT_PRODUCT_ID);
   const prompt = `Write an Etsy listing for a ${product.garment} in this niche:\n\n${niche}`;
 
-  return requestListing([{ type: "text", text: prompt }], options);
+  return requestListing(
+    [{ type: "text", text: prompt }, ...targetBlock(options.targetKeywords)],
+    options,
+  );
 }
 
 export interface DesignInput {
@@ -278,6 +312,7 @@ export function generateFromDesign(
         image_url: { url: `data:${design.mediaType};base64,${design.data}` },
       },
       { type: "text", text: prompt },
+      ...targetBlock(options.targetKeywords),
     ],
     options,
   );

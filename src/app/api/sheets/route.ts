@@ -74,6 +74,8 @@ const generateSchema = z.object({
   spreadsheetId: z.string().trim().min(1).transform(extractSpreadsheetId),
   sheetName: z.string().trim().min(1).default(DEFAULT_SHEET_NAME),
   productId: z.string().trim().optional(),
+  /** Phrases every row in this batch should try to reach. */
+  targetKeywords: z.string().trim().max(1000).optional(),
   /** Rows per request. Kept small so a serverless run cannot time out. */
   limit: z.number().int().min(1).max(50).default(BATCH_SIZE),
   /** Off runs a dry pass: listings come back, the sheet is left untouched. */
@@ -103,7 +105,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
 
-    const { spreadsheetId, sheetName, limit, writeBack, productId } = parsed.data;
+    const { spreadsheetId, sheetName, limit, writeBack, productId, targetKeywords } = parsed.data;
     const { layout, rows } = await readNiches(spreadsheetId, sheetName);
     const pending = rows.filter((row) => row.pending).slice(0, limit);
 
@@ -121,7 +123,7 @@ export async function POST(request: Request) {
     const results: BatchResult[] = await Promise.all(
       pending.map(async (entry) => {
         try {
-          const listing = await generateFromNiche(entry.niche, { productId });
+          const listing = await generateFromNiche(entry.niche, { productId, targetKeywords });
           return {
             row: entry.row,
             niche: entry.niche,
