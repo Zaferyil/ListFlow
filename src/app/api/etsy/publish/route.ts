@@ -10,7 +10,7 @@ import {
 } from "@/lib/etsy-api";
 import { contentTypeFor, listTemplates, readTemplate } from "@/lib/etsy-templates";
 import { getAccessToken } from "@/lib/etsy-tokens";
-import { findProduct } from "@/lib/products";
+import { findProduct, isOrnament as isOrnamentProduct } from "@/lib/products";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     // of our own. Price follows the print side, so that menu is the priced one
     // even though it is shown second. The panel normally sends its own edited
     // styles and prices; this stands in for callers that send none.
-    const isOrnament = Boolean(product?.garment.includes("ornament"));
+    const isOrnament = product !== null && isOrnamentProduct(product);
     // Ornaments carry their stock per offering; everything else stocks the
     // listing as a whole and repeats that figure across its variations.
     const variationQuantity = isOrnament ? ORNAMENT_STOCK : draft.quantity;

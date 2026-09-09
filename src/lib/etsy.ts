@@ -21,8 +21,10 @@ export interface Listing {
   description: string;
   tags: string[];
   materials: string[];
-  /** Etsy's "attributes" free-text hints, e.g. suggested category or occasion. */
+  /** Suggested Etsy category path; the seller still picks the real taxonomy. */
   category: string;
+  /** Suggested Etsy attributes, as "Attribute: value" lines. */
+  attributes: string;
   /** Short rationale shown in the UI so the user can judge the suggestion. */
   notes: string;
 }
@@ -73,6 +75,7 @@ export function normalizeListing(listing: Listing): Listing {
       listing.materials.map((m) => m.trim().slice(0, ETSY_LIMITS.materialMaxChars)).filter(Boolean),
     ).slice(0, ETSY_LIMITS.maxMaterials),
     category: listing.category.trim(),
+    attributes: listing.attributes.trim(),
     notes: listing.notes.trim(),
   };
 }
@@ -114,21 +117,77 @@ function words(text: string): string[] {
 }
 
 /**
- * Etsy weights the opening of the title most heavily, so the first few words
- * have to be the phrase a buyer would actually type. We can't read Etsy's
- * index, but we can check the model's own judgement against itself: if the
- * opening words are real search terms, they should also show up in the tags it
- * chose. Fewer than two overlapping words means the title likely opens with
- * branding or filler instead.
+ * Wording Etsy tells sellers to keep out of a title. It is promotional rather
+ * than descriptive, so it takes room from the words a buyer actually searches.
  */
-function opensWithSearchPhrase(listing: Listing): boolean {
-  const opening = words(listing.title).slice(0, 4).filter((word) => !STOPWORDS.has(word));
-  if (opening.length === 0) return false;
+const PROMOTIONAL_TERMS = [
+  "sale",
+  "on sale",
+  "free shipping",
+  "best seller",
+  "bestseller",
+  "perfect gift",
+  "best gift",
+  "great gift",
+  "amazing",
+  "beautiful",
+  "must have",
+  "cheap",
+  "top quality",
+];
 
-  const tagWords = new Set(listing.tags.flatMap(words));
-  const overlap = opening.filter((word) => tagWords.has(word)).length;
+export function promotionalTermsIn(title: string): string[] {
+  const haystack = title.toLowerCase();
+  return PROMOTIONAL_TERMS.filter((term) =>
+    new RegExp(`\\b${term.replace(/\s+/g, "\\s+")}\\b`).test(haystack),
+  );
+}
 
-  return overlap >= Math.min(2, opening.length);
+/**
+ * Words the title leans on more than once. Repeating a term used to be how you
+ * ranked for it; Etsy now reads the title as a whole, so a repeat is a word
+ * spent twice on one search instead of once each on two.
+ */
+export function repeatedTitleWords(title: string): string[] {
+  const counts = new Map<string, number>();
+  for (const word of words(title)) {
+    // Short words are the connective tissue of a readable title, not stuffing.
+    if (STOPWORDS.has(word) || word.length < 4) continue;
+    counts.set(word, (counts.get(word) ?? 0) + 1);
+  }
+
+  return [...counts.entries()].filter(([, count]) => count > 1).map(([word]) => word);
+}
+
+/**
+ * Tags that reach for the same search as another tag. Two tags sharing every
+ * significant word ("custom name ornament" and "personalized name ornament"
+ * do not; "name ornament" and "custom name ornament" do) compete with each
+ * other rather than covering a query the listing would otherwise miss.
+ */
+export function duplicatedTags(tags: string[]): string[] {
+  const significant = tags.map(
+    (tag) => new Set(words(tag).filter((word) => !STOPWORDS.has(word))),
+  );
+
+  const flagged: string[] = [];
+  for (let i = 0; i < tags.length; i += 1) {
+    for (let j = 0; j < i; j += 1) {
+      const [smaller, larger] =
+        significant[i].size <= significant[j].size
+          ? [significant[i], significant[j]]
+          : [significant[j], significant[i]];
+      if (smaller.size === 0) continue;
+
+      // Contained in another tag: every word it searches, the other searches too.
+      if ([...smaller].every((word) => larger.has(word))) {
+        flagged.push(tags[i]);
+        break;
+      }
+    }
+  }
+
+  return flagged;
 }
 
 /**
@@ -245,20 +304,48 @@ export function inspectListing(listing: Listing, requiredKeywords: string[] = []
     });
   }
 
-  if (!opensWithSearchPhrase(listing)) {
+  const promotional = promotionalTermsIn(listing.title);
+  if (promotional.length > 0) {
     warnings.push({
       field: "title",
-      message:
-        "The first 3-4 words don't look like a search phrase. Etsy weights the start of the title most heavily — open with what a buyer would type.",
+      message: `Promotional wording in the title: ${promotional.join(
+        ", ",
+      )}. Etsy asks you to leave it out — it takes room from words buyers search.`,
     });
   }
 
-  if (listing.title.length < 60) {
+  const repeated = repeatedTitleWords(listing.title);
+  if (repeated.length > 0) {
     warnings.push({
       field: "title",
-      message: `Title is ${listing.title.length} characters. Etsy search rewards 100-140.`,
+      message: `"${repeated.join('", "')}" ${
+        repeated.length === 1 ? "appears" : "appear"
+      } more than once in the title. Repeating a term no longer ranks it higher — say it once and use the room for something else.`,
     });
   }
+
+  // Etsy's own guidance is a clear, human-readable title; long keyword chains
+  // are the tactic it moved away from.
+  const titleWords = words(listing.title).length;
+  if (titleWords > 15) {
+    warnings.push({
+      field: "title",
+      message: `Title runs to ${titleWords} words. Aim for under 15 — a title a buyer can read beats one padded with keywords.`,
+    });
+  }
+
+  const duplicated = duplicatedTags(listing.tags);
+  if (duplicated.length > 0) {
+    warnings.push({
+      field: "tags",
+      message: `${duplicated.length} tag${
+        duplicated.length === 1 ? "" : "s"
+      } cover a search another tag already reaches: ${duplicated.join(
+        ", ",
+      )}. Each one is a slot that could be finding a different buyer.`,
+    });
+  }
+
   if (listing.tags.length < ETSY_LIMITS.maxTags) {
     warnings.push({
       field: "tags",
@@ -268,7 +355,16 @@ export function inspectListing(listing: Listing, requiredKeywords: string[] = []
   if (listing.description.length < 200) {
     warnings.push({
       field: "description",
-      message: "Description is thin. Add fit, feel, and occasion details.",
+      message: "Description is thin. Say what the product is, what the design shows, and what sets it apart.",
+    });
+  }
+
+  // Etsy reads the description too, so opening it with the title verbatim
+  // spends the strongest lines of the listing repeating what it already says.
+  if (listing.description.slice(0, listing.title.length).trim() === listing.title.trim()) {
+    warnings.push({
+      field: "description",
+      message: "The description opens with the title word for word. Lead with what the product is and what the design shows instead.",
     });
   }
 

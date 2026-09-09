@@ -7,7 +7,13 @@ import {
   missingRequiredKeywords,
   normalizeListing,
 } from "./etsy";
-import { DEFAULT_PRODUCT_ID, findProduct, productFacts, type Product } from "./products";
+import {
+  DEFAULT_PRODUCT_ID,
+  findProduct,
+  isOrnament,
+  productFacts,
+  type Product,
+} from "./products";
 
 type UserContent = OpenAI.Chat.Completions.ChatCompletionContentPart;
 
@@ -21,22 +27,27 @@ const LISTING_SCHEMA = {
   properties: {
     title: {
       type: "string",
-      description: `Etsy listing title, at most ${ETSY_LIMITS.titleMaxChars} characters. The FIRST 3-4 WORDS must be the exact phrase a buyer types into Etsy search, then separate secondary phrases with commas or pipes.`,
+      description: `Etsy listing title, at most ${ETSY_LIMITS.titleMaxChars} characters and ideally under 15 words. It must read as a title a person wrote: say what the product is first, then its strongest identifying traits, separated by commas. Never a chain of repeated keywords.`,
     },
     description: {
       type: "string",
       description:
-        "Etsy listing description for a printed shirt. Open with a one-sentence hook that repeats the main keyword, then cover what the shirt is, who it suits, the fit and feel, occasions to wear or gift it, and care. Use short paragraphs and a bulleted list.",
+        "Etsy listing description written for a buyer. The opening sentences say what the product is, what the design shows, and the one thing that sets it apart, with the important search phrases carried naturally. Then short labelled sections covering only what is actually known about this product.",
     },
     tags: {
       type: "array",
       items: { type: "string" },
-      description: `Exactly ${ETSY_LIMITS.maxTags} Etsy tags, each at most ${ETSY_LIMITS.tagMaxChars} characters. Prefer multi-word long-tail phrases that a buyer would actually type. No duplicated phrases, no single generic words like "gift", and never a file format or download phrase.`,
+      description: `Exactly ${ETSY_LIMITS.maxTags} Etsy tags, each at most ${ETSY_LIMITS.tagMaxChars} characters. Every tag is a distinct search a real buyer would type, spread across product type, theme, style, audience, occasion and material. No near-duplicates, no misspellings, no file or download terms.`,
     },
     category: {
       type: "string",
       description:
-        "Suggested Etsy category path under Clothing, e.g. 'Clothing > Unisex Adult Clothing > T-Shirts & Tees'.",
+        "The most specific accurate Etsy category path for this actual product, e.g. 'Clothing > Unisex Adult Clothing > T-Shirts & Tees' or 'Home & Living > Home Decor > Ornaments & Accents > Ornaments'. Never a broad category where a specific one exists, and never chosen for search volume over accuracy.",
+    },
+    attributes: {
+      type: "string",
+      description:
+        "Etsy attribute values to set on the listing, as 'Attribute: value' pairs separated by newlines — e.g. 'Holiday: Christmas'. Only attributes that exist for the chosen category and only values supported by the product facts. Empty string if none apply.",
     },
     notes: {
       type: "string",
@@ -44,46 +55,90 @@ const LISTING_SCHEMA = {
         "Two or three sentences for the seller explaining the keyword strategy behind these choices, and anything they should verify manually.",
     },
   },
-  required: ["title", "description", "tags", "category", "notes"],
+  required: ["title", "description", "tags", "category", "attributes", "notes"],
   additionalProperties: false,
 } as const;
 
+/** How to build a title and pick keywords for each kind of product. */
+function strategyFor(product: Product): string[] {
+  if (isOrnament(product)) {
+    return [
+      `This is an ornament, not apparel. Build the title from the ornament itself, the theme or occasion it is for, the design, and the material where it genuinely distinguishes the product.`,
+      "A title of this shape works well: \"Personalized Family Christmas Ornament, Ceramic, Custom Names\".",
+      "Never borrow apparel wording. No fit, no sizing, no sleeves, no \"tee\", and nothing about how it wears.",
+      "Only call it personalized, custom or made with the buyer's names if the product facts above actually say so. Personalization is a promise a buyer will hold you to.",
+    ];
+  }
+
+  const audience =
+    product.audience === "youth"
+      ? "This is a youth garment, so kids/youth wording belongs in the title and keywords — write for the adult buying it for a child."
+      : "Name the audience only where it genuinely narrows the search, such as women's or men's; do not add one to fill space.";
+
+  return [
+    `This is apparel. Build the title from the product type, the design or theme, the style, and the audience where it genuinely helps.`,
+    'A title of this shape works well: "Vintage Halloween Ghost T-Shirt, Retro Graphic Tee".',
+    audience,
+    `Call it a ${product.garment}. Do not call it a tee if it is a sweatshirt, or the other way round.`,
+  ];
+}
+
 function systemPrompt(product: Product, requiredKeywords: string[]): string {
+  const noun = product.garment;
+
   const lines = [
-    "You are an Etsy SEO specialist who writes listings that rank in Etsy search and convert browsers into buyers.",
-    "You write for the US Etsy market: American English spelling, American sizing conventions, and phrasing a US buyer would use.",
+    "You are an Etsy listing specialist. You optimize for Etsy search as it works now, not for the keyword-stuffing tactics that used to work.",
+    "You write for the US Etsy market: American English spelling and phrasing a US buyer would use.",
     "",
-    `THE PRODUCT IS ALWAYS A PHYSICAL PRINTED ${product.garment.toUpperCase()} that the seller prints and ships. It is never a digital file.`,
-    `- When you are shown a design, that design is what gets printed on the ${product.garment}. The listing sells the finished garment, not the artwork and not the file.`,
+    `THE PRODUCT IS ALWAYS A PHYSICAL ${noun.toUpperCase()} that the seller makes and ships. It is never a digital file.`,
+    `- When you are shown a design, that design is what gets printed on the ${noun}. The listing sells the finished ${noun}, not the artwork and not the file.`,
     "- Never write the listing as a digital download, printable, clipart, cut file, or sublimation file, and never say a file is delivered or downloaded.",
-    "- Never put a file format or download phrase in the title, the tags, or the materials: no PNG, SVG, JPG, PDF, EPS, DXF, 'digital download', 'instant download', 'printable', 'downloadable', 'clipart', 'cut file'. A buyer searching those wants a file, not your shirt, so they are the wrong traffic.",
-    "- Write for someone who will wear it or gift it. Cover fit, feel, and occasion instead of file contents.",
+    "- Never put a file format or download phrase in the title, the tags, or the materials: no PNG, SVG, JPG, PDF, EPS, DXF, 'digital download', 'instant download', 'printable', 'downloadable', 'clipart', 'cut file'. A buyer searching those wants a file, so they are the wrong traffic entirely.",
     "",
-    "The blank is fixed. These are manufacturer specifications, verified — you may state them as fact, and you should, because fabric and fit are what a buyer compares between listings:",
+    "PRODUCT FACTS. These are verified manufacturer specifications and they are the source of truth. You may state them, and you should, because they are what a buyer compares between listings:",
     ...productFacts(product),
-    `- Call the garment a ${product.garment} in the copy. Do not call it a tee if it is a sweatshirt, or the other way round.`,
-    "- Do not go beyond these facts. Sizing charts, exact colour names, print method and shipping are still unknown unless the seller told you.",
+    "- Never invent anything beyond these facts: no material, no size, no colour, no production method, no care instructions, no personalization, no dimensions. If a detail is unknown, write about the design instead of guessing.",
+    "- Do not promise delivery times, processing times or refunds.",
     "",
-    "Rules you must follow:",
-    `- Title: at most ${ETSY_LIMITS.titleMaxChars} characters, and aim for 110-140 to use the space Etsy gives you.`,
-    "- THE OPENING OF THE TITLE IS THE MOST IMPORTANT RANKING SIGNAL. Etsy weights the first few words most heavily, so the first 3-4 words must be, verbatim, the phrase a buyer would type into the search box.",
-    "- Do not open the title with a brand name, a shop name, an adjective like 'Beautiful' or 'Unique', or a filler word. Those go later in the title. A brand belongs at the front only when buyers genuinely search for that brand first.",
-    "- The opening phrase must also appear among the tags. If you would not use it as a tag, it is not a search phrase and does not belong at the front of the title.",
-    `- Tags: exactly ${ETSY_LIMITS.maxTags} tags, each at most ${ETSY_LIMITS.tagMaxChars} characters.`,
-    "- Tags must be long-tail buyer phrases, not one-word categories, and must not simply repeat each other.",
-    "- Beyond the specifications above, never invent product attributes. If a detail is unknown, describe the printed design instead of guessing at the sizing chart, print method, or shipping.",
-    "- Do not promise delivery times or refunds.",
+    "TITLE.",
+    `- At most ${ETSY_LIMITS.titleMaxChars} characters, but length is not a target — aim for under 15 words. A shorter title that reads clearly beats a longer one padded with keywords.`,
+    "- A buyer must know what the product is from the first few words. Lead with the product type and its strongest identifying trait, then add the theme, style or material.",
+    "- It has to read like a title a real seller wrote for a human. Never a chain of comma-separated keywords.",
+    '- Never repeat a word or phrase to gain ranking. "Halloween Shirt Halloween T Shirt Halloween Gift Spooky Shirt" is exactly what to avoid.',
+    "- Banned outright: SALE, ON SALE, FREE SHIPPING, BEST SELLER, PERFECT GIFT, BEST GIFT, AMAZING, BEAUTIFUL, MUST HAVE, CHEAP, BEST, #1, and any other promotional wording.",
+    "- Do not add a recipient or an occasion just to fill the title. Include one only when it genuinely identifies the product.",
+    "",
+    "PRODUCT STRATEGY.",
+    ...strategyFor(product).map((line) => `- ${line}`),
+    "",
+    `TAGS. Exactly ${ETSY_LIMITS.maxTags}, each at most ${ETSY_LIMITS.tagMaxChars} characters.`,
+    "- Each tag is a separate search opportunity. Spend them across different kinds of search: the core product type, the design or theme, the style, the audience, the occasion or use, the material, and a longer specific phrase or two.",
+    "- Multi-word phrases beat single words. Ask of each one: would a real buyer type this into Etsy? If not, drop it.",
+    "- Do not write thirteen versions of one phrase. Near-duplicates compete with each other instead of reaching a new query.",
+    "- No deliberate misspellings, no unrelated trending terms, no second language, and no trademark or celebrity terms unless the product facts genuinely support them.",
+    "- Do not spend a tag restating what the category or an attribute already tells Etsy, unless it is also a phrase buyers really search.",
+    "",
+    "DESCRIPTION.",
+    "- Write for a human buyer first, carrying the important phrases naturally as you go.",
+    "- The opening sentences make clear what the product is, what the design shows, and the one thing that sets it apart.",
+    "- Do not repeat the title word for word, and never write a keyword list dressed up as a paragraph.",
+    "- Use short labelled sections where they apply — PRODUCT DETAILS, MATERIAL, SIZING, CARE INSTRUCTIONS, WHAT YOU'LL RECEIVE — and include only the ones you actually have facts for.",
+    "",
+    "CATEGORY AND ATTRIBUTES.",
+    "- Give the most specific accurate Etsy category for this actual product. Never a broad one where a specific one exists, and never pick for search volume over accuracy.",
+    "- Give the Etsy attributes that exist for that category and that the product facts support. Attributes are structured data, not another place to put keywords.",
+    "",
+    "Etsy reads the whole listing, so distribute rather than repeat: the title carries the product and its strongest traits, the tags reach the searches the title cannot, attributes carry the structured facts, and the description gives the context.",
   ];
 
   if (requiredKeywords.length > 0) {
     const list = requiredKeywords.map((keyword) => `"${keyword}"`).join(", ");
     lines.push(
       "",
-      "Required keywords:",
+      "REQUIRED KEYWORDS.",
       `- Each of these terms must appear in the title, at least once in the description, and inside at least one tag: ${list}.`,
       "- Etsy matches title, description and tags separately, so a term present in only one of them is invisible in the other two.",
-      "- Keep the term readable in context — work it into a natural phrase (e.g. a tag like 'comfort colors tee'), do not bolt it on as a bare label.",
-      "- These terms are additional to, not a replacement for, the search phrase that opens the title.",
+      "- These are real product facts a buyer searches by, not padding — work each one into a natural phrase, do not bolt it on as a bare label.",
       `- AT MOST ${MAX_TAGS_PER_REQUIRED_KEYWORD} tags may contain any one of these terms. Two variants already cover that search; a third is a tag slot competing with your own listing instead of reaching a different query. Spend the remaining tags on the design, the occasion, the recipient, and the style.`,
     );
   }
@@ -164,7 +219,7 @@ async function requestListing(
           "A previous attempt at this listing failed its keyword requirements:",
           ...corrections,
           "",
-          "Write the listing again with those terms worked in naturally, while keeping every other rule — especially that the first 3-4 words of the title are the buyer's search phrase.",
+          "Write the listing again with those terms worked in naturally, keeping every other rule — the title still has to read like a person wrote it, not like a keyword list with the missing terms appended.",
         ].join("\n"),
       },
     ],
@@ -182,7 +237,7 @@ async function requestListing(
 /** Generates a listing from a niche keyword pulled out of a Google Sheet. */
 export function generateFromNiche(niche: string, options: GenerateOptions = {}): Promise<Listing> {
   const product = findProduct(options.productId ?? DEFAULT_PRODUCT_ID);
-  const prompt = `Write an Etsy listing for a printed ${product.garment} in this niche:\n\n${niche}`;
+  const prompt = `Write an Etsy listing for a ${product.garment} in this niche:\n\n${niche}`;
 
   return requestListing([{ type: "text", text: prompt }], options);
 }
@@ -204,12 +259,13 @@ export function generateFromDesign(
   design: DesignInput,
   options: GenerateOptions = {},
 ): Promise<Listing> {
+  const product = findProduct(options.productId ?? DEFAULT_PRODUCT_ID);
   const prompt = [
-    `This design is printed on a ${findProduct(options.productId ?? DEFAULT_PRODUCT_ID).garment}. Write the Etsy listing for that garment.`,
+    `This design is printed on a ${product.garment}. Write the Etsy listing for that ${product.garment}.`,
     "Describe what you actually see in the design — subject, wording, style, colour palette, typography, mood — and build the keywords from that.",
-    "The design is the selling point, but the product being sold is the garment itself.",
+    `The design is the selling point, but the product being sold is the ${product.garment} itself.`,
     design.flattenedBackground
-      ? `\nThis image was converted from a vector file with a transparent background. The flat ${design.flattenedBackground} backdrop was added by that conversion — it is not part of the design. Ignore it entirely: do not mention it, do not treat it as a colour of the artwork, and assume the design is printed on the garment colour the seller chooses.`
+      ? `\nThis image was converted from a vector file with a transparent background. The flat ${design.flattenedBackground} backdrop was added by that conversion — it is not part of the design. Ignore it entirely: do not mention it, do not treat it as a colour of the artwork, and assume the design is printed on the ${product.garment} colour the seller chooses.`
       : "",
   ].join("\n");
 

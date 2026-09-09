@@ -13,14 +13,24 @@
 
 export type Audience = "adult" | "youth";
 
+/**
+ * What kind of thing this is, which decides the listing strategy. Etsy SEO for
+ * a garment and for an ornament are not the same shape — one is sized, fitted
+ * and worn, the other is themed and hung — and forcing apparel wording onto an
+ * ornament produces a listing that ranks for the wrong searches. Declared here
+ * rather than read out of the garment noun, so nothing hangs on a substring.
+ */
+export type ProductKind = "apparel" | "ornament";
+
 export interface Product {
   id: string;
   /** Shown on the selector button. */
   label: string;
   brand: string;
   sku: string;
-  /** The noun to use for the garment in copy, e.g. "t-shirt". */
+  /** The noun to use for the product in copy, e.g. "t-shirt". */
   garment: string;
+  kind: ProductKind;
   audience: Audience;
   /** Fabric content for standard/solid colorways. */
   composition: string;
@@ -61,6 +71,7 @@ export const PRODUCTS: Product[] = [
     brand: "Comfort Colors",
     sku: "1717",
     garment: "t-shirt",
+    kind: "apparel",
     audience: "adult",
     composition: "100% US ring-spun cotton, 20 singles",
     weight: "6.1 oz/yd²",
@@ -108,6 +119,7 @@ export const PRODUCTS: Product[] = [
     brand: "Gildan",
     sku: "64000",
     garment: "t-shirt",
+    kind: "apparel",
     audience: "adult",
     composition: "100% preshrunk ring-spun cotton, 30 singles",
     weight: "4.5 oz/yd²",
@@ -130,6 +142,7 @@ export const PRODUCTS: Product[] = [
     brand: "Gildan",
     sku: "18500",
     garment: "hooded sweatshirt",
+    kind: "apparel",
     audience: "adult",
     composition: "50/50 cotton/polyester, 20 singles",
     weight: "8.0 oz/yd²",
@@ -153,6 +166,7 @@ export const PRODUCTS: Product[] = [
     brand: "AWDis",
     sku: "JH030",
     garment: "sweatshirt",
+    kind: "apparel",
     audience: "adult",
     composition: "80% ring-spun cotton, 20% polyester",
     weight: "280 gsm",
@@ -174,6 +188,7 @@ export const PRODUCTS: Product[] = [
     brand: "Gildan",
     sku: "2400",
     garment: "long sleeve t-shirt",
+    kind: "apparel",
     audience: "adult",
     composition: "100% cotton preshrunk jersey knit, 18 singles",
     weight: "6.0 oz/yd²",
@@ -197,6 +212,7 @@ export const PRODUCTS: Product[] = [
     brand: "Gildan",
     sku: "5000B",
     garment: "t-shirt",
+    kind: "apparel",
     audience: "youth",
     composition: "100% cotton, 20 singles",
     weight: "5.3 oz/yd²",
@@ -218,6 +234,7 @@ export const PRODUCTS: Product[] = [
     brand: "Comfort Colors",
     sku: "9018",
     garment: "t-shirt",
+    kind: "apparel",
     audience: "youth",
     composition: "100% ring-spun cotton, 20 singles",
     weight: "6.1 oz/yd²",
@@ -239,6 +256,7 @@ export const PRODUCTS: Product[] = [
     brand: "Ceramic",
     sku: "ceramic-ornament",
     garment: "ceramic ornament",
+    kind: "ornament",
     audience: "adult",
     composition: "100% ceramic",
     weight: "lightweight ceramic",
@@ -275,14 +293,27 @@ export function requiredKeywordsFor(productId: string | undefined): string[] {
   return findProduct(productId).requiredKeywords;
 }
 
+export function isOrnament(product: Product): boolean {
+  return product.kind === "ornament";
+}
+
 /** The manufacturer facts the model is allowed to state, as prompt lines. */
 export function productFacts(product: Product): string[] {
-  const lines = [
-    `- Blank: ${product.brand} ${product.sku}, a ${product.audience === "youth" ? "youth" : "adult unisex"} ${product.garment}.`,
-    `- Fabric: ${product.composition}, ${product.weight}.`,
-    `- Fit: ${product.fit}.`,
-    ...product.features.map((feature) => `- ${feature[0].toUpperCase()}${feature.slice(1)}.`),
-  ];
+  // An ornament has no fabric, no fit and no wearer, so labelling its specs
+  // that way invites copy about how it wears.
+  const lines = isOrnament(product)
+    ? [
+        `- Product: a ${product.garment}.`,
+        `- Material: ${product.composition}, ${product.weight}.`,
+        `- Shapes and sizes: ${product.fit}.`,
+        ...product.features.map((feature) => `- ${feature[0].toUpperCase()}${feature.slice(1)}.`),
+      ]
+    : [
+        `- Blank: ${product.brand} ${product.sku}, a ${product.audience === "youth" ? "youth" : "adult unisex"} ${product.garment}.`,
+        `- Fabric: ${product.composition}, ${product.weight}.`,
+        `- Fit: ${product.fit}.`,
+        ...product.features.map((feature) => `- ${feature[0].toUpperCase()}${feature.slice(1)}.`),
+      ];
 
   if (product.colorCaveat) {
     lines.push(

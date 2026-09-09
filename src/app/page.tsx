@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { Listing, ListingWarning } from "@/lib/etsy";
-import { DEFAULT_PRODUCT_ID, findProduct, PRODUCTS } from "@/lib/products";
+import { DEFAULT_PRODUCT_ID, findProduct, isOrnament, PRODUCTS } from "@/lib/products";
 import { DropZone } from "./DropZone";
 import { EtsyPanel } from "./EtsyPanel";
 import { ListingCard } from "./ListingCard";
@@ -73,8 +73,8 @@ function BlankPicker({
   const product = findProduct(productId);
 
   // Separate garments from ornaments
-  const garments = PRODUCTS.filter((p) => !p.garment.includes("ornament"));
-  const ornaments = PRODUCTS.filter((p) => p.garment.includes("ornament"));
+  const garments = PRODUCTS.filter((entry) => !isOrnament(entry));
+  const ornaments = PRODUCTS.filter(isOrnament);
 
   return (
     <div className="card">

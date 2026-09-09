@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { Listing } from "@/lib/etsy";
-import { findProduct } from "@/lib/products";
+import { findProduct, isOrnament as productIsOrnament } from "@/lib/products";
 import { FileDrop } from "./FileDrop";
 import { FOR_ETSY, prepareForUpload } from "./shrink";
 
@@ -198,7 +198,7 @@ function settingsKey(productId: string): string {
  * seller has not set up yet, so editing the list is never undone by a reload.
  */
 function loadSettings(productId: string, catalogColors: string): PublishSettings {
-  const isOrnament = findProduct(productId).garment.includes("ornament");
+  const isOrnament = productIsOrnament(findProduct(productId));
   const fallback = {
     ...DEFAULTS,
     colorsText: catalogColors,
@@ -347,7 +347,7 @@ export function EtsyPanel({
   }
 
   const product = findProduct(productId);
-  const isOrnament = product.garment.includes("ornament");
+  const isOrnament = productIsOrnament(product);
 
   const update = useCallback(
     (patch: Partial<PublishSettings>) => {

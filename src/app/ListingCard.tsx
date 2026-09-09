@@ -95,6 +95,16 @@ export function ListingCard({
         </section>
       )}
 
+      {listing.attributes && (
+        <section>
+          <div className="meta">
+            <h3>Suggested attributes</h3>
+            <CopyButton value={listing.attributes} />
+          </div>
+          <pre style={{ margin: 0 }}>{listing.attributes}</pre>
+        </section>
+      )}
+
       {listing.notes && (
         <section>
           <h3>Strategy note</h3>
