@@ -884,6 +884,13 @@ button.linklike {
   align-items: stretch;
 }
 
+/* The title's flex-basis is meant as a width. Once the row turns into a
+   column that basis becomes a height, and a 14rem-tall link left a hole
+   between the title and its findings. */
+.audit-rows > li > a {
+  flex: 0 0 auto;
+}
+
 .audit-rows li ul {
   margin: 0.35rem 0 0;
   padding-left: 1.1rem;
