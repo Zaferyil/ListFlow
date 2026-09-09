@@ -57,11 +57,17 @@ function ListingRows({
             {entry.title}
           </a>
           <span>
-            {showRevenue && <strong>{money(entry.revenue, currency)}</strong>}
-            {showRevenue && entry.unitsSold > 0 && ` · ${entry.unitsSold} sold`}
-            {showRevenue && entry.unitsSold > 0 && entry.favorites > 0 && " · "}
-            {entry.favorites > 0 && `${entry.favorites} favourites`}
-            {!showRevenue && entry.favorites === 0 && "no favourites, no sales"}
+            {[
+              showRevenue ? money(entry.revenue, currency) : null,
+              entry.unitsSold > 0 ? `${entry.unitsSold} sold` : null,
+              entry.favorites > 0 ? `${entry.favorites} favourites` : null,
+              // Age and photo count are why a listing with nothing to show has
+              // nothing to show, so they belong beside the zero.
+              entry.ageDays > 0 ? `live ${entry.ageDays} days` : null,
+              `${entry.imageCount} photo${entry.imageCount === 1 ? "" : "s"}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </li>
       ))}
@@ -268,8 +274,10 @@ export function ShopReport() {
             No favourites, no sales ({report.unnoticed.length})
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Nothing is reaching these. That points at the listing itself — the title, the tags, the
-            category — rather than at the design.
+            Nothing is reaching these, oldest first — one live for months without a single
+            favourite has been answered, where last week&apos;s has not been asked yet. Check the
+            photo count as well as the wording: Etsy search is a grid of images, and a listing with
+            one or two photos loses the click before the title is ever read.
           </p>
           <ListingRows
             listings={report.unnoticed}

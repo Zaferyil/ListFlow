@@ -257,20 +257,35 @@ export interface ShopListingSummary {
   description: string;
   tags: string[];
   favorites: number;
+  /** Photos on the listing. Etsy search is a grid of these. */
+  imageCount: number;
+  /**
+   * When the listing was first created, in epoch seconds. The original rather
+   * than the current timestamp, which a renewal resets — what matters is how
+   * long the listing has been trying, not when it last rolled over.
+   */
+  createdAt: number;
 }
 
-function toSummary(entry: {
+interface RawListing {
   listing_id: number;
   title: string;
   description?: string;
   tags?: string[];
   num_favorers?: number;
-}): ShopListingSummary {
+  images?: unknown[];
+  original_creation_timestamp?: number;
+  created_timestamp?: number;
+}
+
+function toSummary(entry: RawListing): ShopListingSummary {
   return {
     listingId: entry.listing_id,
     title: entry.title,
     description: entry.description ?? "",
     tags: entry.tags ?? [],
+    imageCount: entry.images?.length ?? 0,
+    createdAt: entry.original_creation_timestamp ?? entry.created_timestamp ?? 0,
     // Etsy exposes favourites per listing but not views: there is no view or
     // visit count anywhere in the v3 schema, so "most looked at" cannot be
     // answered from the API at all.
@@ -297,16 +312,12 @@ export async function getShopListings(
   for (let offset = 0; offset < max; offset += pageSize) {
     if (offset > 0) await sleep(250);
 
-    const response = await etsyFetch<{
-      count: number;
-      results: {
-        listing_id: number;
-        title: string;
-        description?: string;
-        tags?: string[];
-        num_favorers?: number;
-      }[];
-    }>(`/shops/${shopId}/listings?limit=${pageSize}&offset=${offset}&state=active`, accessToken);
+    // includes=Images brings the photos back with the listings, so counting
+    // them costs nothing beyond the page already being fetched.
+    const response = await etsyFetch<{ count: number; results: RawListing[] }>(
+      `/shops/${shopId}/listings?limit=${pageSize}&offset=${offset}&state=active&includes=Images`,
+      accessToken,
+    );
 
     listings.push(...response.results.map(toSummary));
     if (response.results.length < pageSize || listings.length >= response.count) break;
@@ -323,15 +334,7 @@ export async function getListing(
   accessToken: string,
   listingId: number,
 ): Promise<ShopListingSummary> {
-  return toSummary(
-    await etsyFetch<{
-      listing_id: number;
-      title: string;
-      description?: string;
-      tags?: string[];
-      num_favorers?: number;
-    }>(`/listings/${listingId}`, accessToken),
-  );
+  return toSummary(await etsyFetch<RawListing>(`/listings/${listingId}?includes=Images`, accessToken));
 }
 
 /** Etsy sends money as a minor-unit amount with the divisor to apply. */

@@ -15,12 +15,62 @@ export interface ShopListingSummary {
   listingId: number;
   title: string;
   favorites: number;
+  imageCount: number;
+  createdAt: number;
+}
+
+/**
+ * Photos Etsy's own guidance asks for. Search results are a grid of images:
+ * the title decides whether a listing is matched, the first photo decides
+ * whether it is opened, and the rest decide whether it is believed.
+ */
+const WANTED_IMAGES = 5;
+
+/** Long enough live that silence is a verdict rather than a wait. */
+const SETTLED_DAYS = 60;
+
+function ageInDays(createdAt: number): number {
+  if (!createdAt) return 0;
+  return Math.max(0, Math.floor((Date.now() / 1000 - createdAt) / 86400));
 }
 
 export interface AuditedListing {
   listingId: number;
   title: string;
   warnings: ListingWarning[];
+}
+
+/**
+ * What a listing's own record says about it, beyond its wording.
+ *
+ * The copy checks ask whether a listing can be found. These ask whether it is
+ * worth finding — enough photos to be opened, and long enough live that having
+ * drawn nobody at all is a result rather than a wait. Ordered first because
+ * neither is fixed by a rewrite.
+ */
+function listingHealth(listing: {
+  imageCount: number;
+  favorites: number;
+  createdAt: number;
+}): ListingWarning[] {
+  const warnings: ListingWarning[] = [];
+  const age = ageInDays(listing.createdAt);
+
+  if (listing.imageCount < WANTED_IMAGES) {
+    warnings.push({
+      field: "title",
+      message: `Only ${listing.imageCount} photo${listing.imageCount === 1 ? "" : "s"}. Etsy search is a grid of images — the wording decides whether you are matched, the first photo decides whether you are opened. Aim for ${WANTED_IMAGES} or more.`,
+    });
+  }
+
+  if (age >= SETTLED_DAYS && listing.favorites === 0) {
+    warnings.push({
+      field: "title",
+      message: `Live ${age} days with no favourites at all. That is long enough to be a verdict: nobody is reaching this listing, or nobody who reaches it wants it.`,
+    });
+  }
+
+  return warnings;
 }
 
 /**
@@ -34,13 +84,21 @@ export interface AuditedListing {
  * that was; flagging every one for a missing brand term would be noise.
  */
 export function auditListings(
-  listings: { listingId: number; title: string; description: string; tags: string[] }[],
+  listings: {
+    listingId: number;
+    title: string;
+    description: string;
+    tags: string[];
+    imageCount: number;
+    favorites: number;
+    createdAt: number;
+  }[],
 ): AuditedListing[] {
   return listings
     .map((listing) => ({
       listingId: listing.listingId,
       title: listing.title,
-      warnings: inspectListing({
+      warnings: listingHealth(listing).concat(inspectListing({
         title: listing.title,
         description: listing.description,
         tags: listing.tags,
@@ -50,7 +108,7 @@ export function auditListings(
         category: "",
         attributes: "",
         notes: "",
-      }),
+      })),
     }))
     .filter((entry) => entry.warnings.length > 0)
     .sort((a, b) => b.warnings.length - a.warnings.length);
@@ -70,6 +128,9 @@ export interface ListingPerformance {
   favorites: number;
   unitsSold: number;
   revenue: number;
+  imageCount: number;
+  /** Days live. Zero when Etsy gave no creation date. */
+  ageDays: number;
 }
 
 export interface ShopReport {
@@ -116,6 +177,8 @@ export function buildShopReport(
       favorites: listing.favorites,
       unitsSold: result?.units ?? 0,
       revenue: result?.revenue ?? 0,
+      imageCount: listing.imageCount,
+      ageDays: ageInDays(listing.createdAt),
     };
   });
 
@@ -134,6 +197,11 @@ export function buildShopReport(
     favoritedNeverSold: performance
       .filter((entry) => entry.unitsSold === 0 && entry.favorites >= INTEREST_THRESHOLD)
       .sort((a, b) => b.favorites - a.favorites),
-    unnoticed: performance.filter((entry) => entry.unitsSold === 0 && entry.favorites === 0),
+    // Every figure here is zero, so ordering by revenue says nothing. Oldest
+    // first: a listing that has been live for months without a single
+    // favourite has been answered, where last week's has not been asked yet.
+    unnoticed: performance
+      .filter((entry) => entry.unitsSold === 0 && entry.favorites === 0)
+      .sort((a, b) => b.ageDays - a.ageDays),
   };
 }
