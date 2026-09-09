@@ -479,3 +479,24 @@ export function inspectListing(listing: Listing, requiredKeywords: string[] = []
 
   return warnings;
 }
+
+/** Every number a piece of copy states, normalised for comparison. */
+function numbersIn(text: string): Set<string> {
+  return new Set(text.toLowerCase().match(/\d+(?:\.\d+)?/g) ?? []);
+}
+
+/**
+ * Figures a rewrite states that the listing it came from did not.
+ *
+ * A rewrite of a live listing has no product catalogue behind it — the seller's
+ * own copy is the only account of the product — so a model that knows what a
+ * Comfort Colors 1717 weighs will happily supply the blank model, the fibre
+ * content and the ounces, none of which the listing claimed and none of which
+ * anything here can check. Numbers are where that goes wrong and where it is
+ * catchable: a SKU, a percentage, a weight. Prose can be reworded freely; 6.1
+ * cannot appear from nowhere.
+ */
+export function introducedNumbers(before: string, after: string): string[] {
+  const known = numbersIn(before);
+  return [...numbersIn(after)].filter((value) => !known.has(value));
+}

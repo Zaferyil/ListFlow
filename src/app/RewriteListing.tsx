@@ -7,6 +7,8 @@ interface Proposal {
   existing?: { title: string; description: string; tags: string[] };
   proposed?: Listing;
   warnings?: ListingWarning[];
+  /** Figures the rewrite states that the live listing never did. */
+  introduced?: string[];
   error?: string;
 }
 
@@ -120,6 +122,18 @@ export function RewriteListing({ listingId }: { listingId: number }) {
             <p className="hint">
               <strong>What changed:</strong> {proposal.proposed.notes}
             </p>
+          )}
+
+          {(proposal.introduced ?? []).length > 0 && (
+            <div className="alert error">
+              <strong>Check these before applying: {(proposal.introduced ?? []).join(", ")}</strong>
+              <p style={{ margin: "0.35rem 0 0" }}>
+                The rewrite states figures your listing does not — a blank model, a fibre content,
+                a fabric weight. They may well be right, but nothing here verified them against the
+                product, and a specification on a live listing is one a buyer can hold you to.
+                Confirm they match the blank you actually print on, or press Try again.
+              </p>
+            </div>
           )}
 
           {(proposal.warnings ?? []).length > 0 && (

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getShop, getShopListings, updateListingText } from "@/lib/etsy-api";
 import { getAccessToken } from "@/lib/etsy-tokens";
-import { inspectListing } from "@/lib/etsy";
+import { inspectListing, introducedNumbers } from "@/lib/etsy";
 import { rewriteListing } from "@/lib/listing";
 
 export const runtime = "nodejs";
@@ -45,6 +45,13 @@ export async function POST(request: Request) {
       existing,
       proposed,
       warnings: inspectListing(proposed),
+      // Checked rather than trusted: the instruction not to invent facts is the
+      // only thing standing between a rewrite and a specification the seller
+      // never claimed, and an instruction is not a guarantee.
+      introduced: introducedNumbers(
+        `${existing.title} ${existing.description}`,
+        `${proposed.title} ${proposed.description}`,
+      ),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not rewrite that listing.";
