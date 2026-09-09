@@ -161,26 +161,48 @@ export function refreshTokens(refreshToken: string): Promise<TokenSet> {
   });
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Etsy allows ten requests a second. Anything that makes several calls to
+ * answer one question — the shop report reads listings and pages through
+ * transactions — can brush that limit, and a 429 is a "wait a moment", not a
+ * failure worth showing the seller. Retried with a widening gap, honouring
+ * Retry-After when Etsy sends one. Safe on writes too: a rejected request was
+ * never carried out.
+ */
+const RATE_LIMIT_RETRIES = 3;
+
 /** Authenticated call against the v3 application API. */
 export async function etsyFetch<T>(
   path: string,
   accessToken: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "x-api-key": apiKeyHeader(),
-      authorization: `Bearer ${accessToken}`,
-      ...init.headers,
-    },
-  });
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        "x-api-key": apiKeyHeader(),
+        authorization: `Bearer ${accessToken}`,
+        ...init.headers,
+      },
+    });
 
-  if (!response.ok) {
-    throw new Error(`Etsy API ${path} failed (${response.status}): ${await readError(response)}`);
+    if (response.status === 429 && attempt < RATE_LIMIT_RETRIES) {
+      const retryAfter = Number(response.headers.get("retry-after"));
+      await sleep(
+        Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2 ** attempt * 600,
+      );
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Etsy API ${path} failed (${response.status}): ${await readError(response)}`);
+    }
+
+    return (await response.json()) as T;
   }
-
-  return (await response.json()) as T;
 }
 
 export interface EtsyShop {
@@ -297,6 +319,11 @@ export async function getShopSales(
   const pageSize = 100;
 
   for (let offset = 0; offset < max; offset += pageSize) {
+    // Paced rather than fired back to back: the retry above recovers from a
+    // 429, but not tripping the limit at all is quicker than being told to
+    // wait.
+    if (offset > 0) await sleep(250);
+
     const response = await etsyFetch<{
       count: number;
       results: {
