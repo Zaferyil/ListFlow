@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getShop, getShopListings, getShopSales, isEtsyConfigured } from "@/lib/etsy-api";
 import { getAccessToken } from "@/lib/etsy-tokens";
 import { auditListings, buildShopReport } from "@/lib/shop-report";
-import { seasonReport } from "@/lib/season";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -42,10 +41,6 @@ export async function GET() {
       shop,
       report: buildShopReport(listings, sales),
       audit: auditListings(listings),
-      // The API knows nothing about the market, but it knows the shop and the
-      // calendar the US market runs on — which is what decides a seasonal
-      // listing, since one published after buying starts has missed its year.
-      seasons: seasonReport(listings),
       salesError,
       needsReconnect: Boolean(salesError),
     });

@@ -6,10 +6,11 @@ import { DEFAULT_PRODUCT_ID, findProduct, isOrnament, PRODUCTS } from "@/lib/pro
 import { DropZone } from "./DropZone";
 import { EtsyPanel } from "./EtsyPanel";
 import { ListingCard } from "./ListingCard";
+import { SeasonCalendar } from "./SeasonCalendar";
 import { ShopReport } from "./ShopReport";
 import { FOR_ANALYSIS, prepareForUpload } from "./shrink";
 
-type Tab = "design" | "niche" | "sheet" | "shop";
+type Tab = "design" | "niche" | "sheet" | "shop" | "season";
 
 interface SingleResult {
   listing: Listing;
@@ -564,6 +565,7 @@ const TABS: { id: Tab; label: string; short: string }[] = [
   { id: "niche", label: "Single niche", short: "Niche" },
   { id: "sheet", label: "Google Sheet", short: "Sheet" },
   { id: "shop", label: "Shop report", short: "Shop" },
+  { id: "season", label: "Season calendar", short: "Season" },
 ];
 
 export default function Home() {
@@ -612,7 +614,7 @@ export default function Home() {
           ))}
         </div>
 
-        {tab !== "shop" && (
+        {tab !== "shop" && tab !== "season" && (
           <Step
             number={1}
             title="Blank"
@@ -626,6 +628,7 @@ export default function Home() {
         {tab === "niche" && <NicheTab productId={productId} />}
         {tab === "sheet" && <SheetTab productId={productId} />}
         {tab === "shop" && <ShopReport />}
+        {tab === "season" && <SeasonCalendar />}
       </main>
     </>
   );
