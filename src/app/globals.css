@@ -1021,3 +1021,36 @@ button.linklike {
 .stat-unknown {
   color: var(--muted);
 }
+
+/* Seasonal calendar ------------------------------------------------------ */
+
+.season-rows > li {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+}
+
+.season-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  white-space: normal;
+}
+
+.season-when {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.season-note {
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: normal;
+}
+
+/* A deadline already gone, or nothing listed against one still coming. */
+.season-late {
+  color: var(--warn);
+}
