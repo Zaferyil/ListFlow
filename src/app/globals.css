@@ -1016,3 +1016,8 @@ button.linklike {
   line-height: 1;
   vertical-align: baseline;
 }
+
+/* A figure that could not be read, rather than one that is zero. */
+.stat-unknown {
+  color: var(--muted);
+}

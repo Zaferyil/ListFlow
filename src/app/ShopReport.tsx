@@ -23,11 +23,29 @@ function money(amount: number, currency: string): string {
   }
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/**
+ * A figure, or an honest gap where one could not be read.
+ *
+ * Zero and "not available" look identical once a number is printed, and here
+ * they could not be further apart: a shop whose sales the app was never
+ * permitted to read would otherwise be shown a confident $0.00 and told it has
+ * sold nothing.
+ */
+function Stat({
+  label,
+  value,
+  unavailable = false,
+}: {
+  label: string;
+  value: string;
+  unavailable?: boolean;
+}) {
   return (
     <div className="stat">
-      <span className="stat-value">{value}</span>
-      <span className="stat-label">{label}</span>
+      <span className={`stat-value${unavailable ? " stat-unknown" : ""}`}>
+        {unavailable ? "—" : value}
+      </span>
+      <span className="stat-label">{unavailable ? `${label} — not readable` : label}</span>
     </div>
   );
 }
@@ -201,17 +219,26 @@ export function ShopReport() {
   const { report } = reply;
   const audit = reply.audit ?? [];
   const sellers = report.listings.filter((entry) => entry.unitsSold > 0);
+  // Sales could not be read at all, so every figure drawn from them is absent
+  // rather than zero — including the never-sold lists, which cannot tell a
+  // listing that has sold nothing from one whose sales are invisible here.
+  const salesUnknown = Boolean(reply.salesError);
 
   return (
     <>
       <div className="card">
         <div className="stats">
-          <Stat label="Revenue" value={money(report.totalRevenue, report.currency)} />
-          <Stat label="Items sold" value={String(report.unitsSold)} />
+          <Stat
+            label="Revenue"
+            value={money(report.totalRevenue, report.currency)}
+            unavailable={salesUnknown}
+          />
+          <Stat label="Items sold" value={String(report.unitsSold)} unavailable={salesUnknown} />
           <Stat label="Live listings" value={String(report.listingCount)} />
           <Stat
             label="Listings that sold"
             value={`${sellers.length}/${report.listingCount}`}
+            unavailable={salesUnknown}
           />
         </div>
         <p className="hint">
@@ -243,8 +270,9 @@ export function ShopReport() {
         <section className="card">
           <h3 style={{ marginTop: 0 }}>Favourited, never sold</h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Buyers found these and wanted them, then did not buy. The listing is reaching people;
-            something after that — price, photos, shipping cost — is losing them.
+            {salesUnknown
+              ? "Favourited listings. Whether any of them sold cannot be read on this connection, so treat this as \u201cfavourited\u201d rather than \u201cnever sold\u201d until sales access is granted."
+              : "Buyers found these and wanted them, then did not buy. The listing is reaching people; something after that — price, photos, shipping cost — is losing them."}
           </p>
           <ListingRows
             listings={report.favoritedNeverSold}
