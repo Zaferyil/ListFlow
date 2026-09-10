@@ -1061,3 +1061,35 @@ button.linklike {
   white-space: normal;
   padding-left: 0.9rem;
 }
+
+/* Links ------------------------------------------------------------------ */
+
+/*
+ * Nothing styled links, so every one of them fell back to the browser's own
+ * blue — and its visited purple, which on the dark surfaces here is barely
+ * legible and made a list of listings read as two different things depending on
+ * which had been opened.
+ */
+a {
+  color: var(--accent);
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+/*
+ * A listing title is the heading of its row, not a link inside a sentence, so
+ * it takes the reading colour and says it is clickable with the underline. The
+ * accent is saved for hover, where it marks the one under the cursor.
+ */
+.report-rows > li > a {
+  color: var(--text);
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 2px;
+}
+
+.report-rows > li > a:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
