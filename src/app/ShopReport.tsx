@@ -100,6 +100,19 @@ function ListingRows({
 }
 
 /**
+ * The listing id inside whatever was pasted.
+ *
+ * Reaching for a particular listing, the thing to hand is its URL — from the
+ * shop manager, from the listing page, with a #media or a ?ref trailing it. All
+ * of them carry the id, and matching on that is exact where matching on a title
+ * is a guess.
+ */
+function listingIdIn(term: string): number | null {
+  const digits = term.match(/\d{6,}/);
+  return digits ? Number(digits[0]) : null;
+}
+
+/**
  * The audited listings, searchable and grown on request.
  *
  * Numbered pages would be the obvious thing and the wrong one: the list is
@@ -117,9 +130,12 @@ function AuditRows({ audit }: { audit: AuditedListing[] }) {
   const [updated, setUpdated] = useState<number[]>([]);
 
   const term = search.trim().toLowerCase();
-  const matching = term
-    ? audit.filter((entry) => entry.title.toLowerCase().includes(term))
-    : audit;
+  const wantedId = listingIdIn(term);
+  const matching = !term
+    ? audit
+    : wantedId !== null
+      ? audit.filter((entry) => entry.listingId === wantedId)
+      : audit.filter((entry) => entry.title.toLowerCase().includes(term));
   const visible = matching.slice(0, limit);
 
   return (
@@ -133,11 +149,17 @@ function AuditRows({ audit }: { audit: AuditedListing[] }) {
             setSearch(event.target.value);
             setLimit(15);
           }}
-          placeholder="Search your listings by title"
+          placeholder="Paste a listing URL, or search by title"
         />
       </div>
 
-      {matching.length === 0 && <p className="hint">No listing matches that.</p>}
+      {matching.length === 0 && (
+        <p className="hint">
+          {wantedId !== null
+            ? `Nothing audited under listing ${wantedId}. Only listings that fall short of a check appear here, so it may have passed all of them — or it may not be live.`
+            : "No listing title matches that. Paste the listing's URL to find it exactly."}
+        </p>
+      )}
 
       <ul className="report-rows audit-rows">
         {visible.map((entry) => {
