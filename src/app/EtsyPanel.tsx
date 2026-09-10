@@ -566,6 +566,15 @@ export function EtsyPanel({
           Disconnect
         </button>
       </p>
+      {/* Shown while connected too. Otherwise the only way to find the address
+          Etsy must have registered is to disconnect first — and a seller whose
+          Etsy app carries a stale one then cannot get back in. */}
+      {status.callbackUrl && (
+        <p className="hint" style={{ marginTop: 0 }}>
+          Reconnecting needs this exact address among your Etsy app&apos;s callback URLs:{" "}
+          <code>{status.callbackUrl}</code>
+        </p>
+      )}
 
       <div className="field">
         <label htmlFor="etsy-category">Etsy category</label>
