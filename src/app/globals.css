@@ -1054,3 +1054,10 @@ button.linklike {
 .season-late {
   color: var(--warn);
 }
+
+/* One expiring listing: the date leads, because that is what is acted on. */
+.season-expiry {
+  font-size: 0.85rem;
+  white-space: normal;
+  padding-left: 0.9rem;
+}

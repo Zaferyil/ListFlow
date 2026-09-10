@@ -3,6 +3,19 @@
 import { useEffect, useState } from "react";
 import type { SeasonStatus } from "@/lib/season";
 
+/** "12 Nov 2026" — the date to act by, in the form a calendar is read in. */
+function onDate(epochSeconds: number): string {
+  return new Date(epochSeconds * 1000).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function daysUntil(epochSeconds: number): number {
+  return Math.ceil((epochSeconds * 1000 - Date.now()) / 86_400_000);
+}
+
 /**
  * What is coming, and whether the shop is ready for it.
  *
@@ -79,9 +92,16 @@ export function SeasonCalendar() {
                   : `${season.daysToListBy} days left to publish something that can still rank in time.`}
               </span>
 
+              {season.expiringMidSeason.length > 0 && (
+                <span className="season-note season-late">
+                  Ends mid-season and does not auto-renew — renew each of these before its date, or
+                  it drops out while buyers are still shopping:
+                </span>
+              )}
               {season.expiringMidSeason.map((listing) => (
-                <span key={listing.listingId} className="season-note season-late">
-                  Expires while buyers are still shopping:{" "}
+                <span key={listing.listingId} className="season-note season-expiry">
+                  <strong>{onDate(listing.endsAt)}</strong>{" "}
+                  <span className="season-when">({daysUntil(listing.endsAt)} days)</span>{" "}
                   <a
                     href={`https://www.etsy.com/listing/${listing.listingId}`}
                     target="_blank"

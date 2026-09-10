@@ -183,6 +183,7 @@ export interface SeasonListing {
   createdAt: number;
   /** Epoch seconds, zero when Etsy gave no end date. */
   endsAt: number;
+  autoRenews: boolean;
 }
 
 export interface SeasonStatus {
@@ -197,7 +198,11 @@ export interface SeasonStatus {
   matching: number;
   /** Of those, how many were live before the point they needed to be. */
   seasoned: number;
-  /** Matching listings that expire while buyers are still shopping. */
+  /**
+   * Matching listings that go inactive while buyers are still shopping.
+   * Auto-renewing ones are left out: they lapse and come straight back, which
+   * costs a listing fee, not a season.
+   */
   expiringMidSeason: { listingId: number; title: string; endsAt: number }[];
 }
 
@@ -246,9 +251,14 @@ export function seasonReport(listings: SeasonListing[], now = new Date()): Seaso
         .filter(
           (listing) =>
             listing.endsAt > 0 &&
+            // A listing Etsy renews for you does not go anywhere; warning about
+            // it would be crying wolf on every listing in the shop.
+            !listing.autoRenews &&
             listing.endsAt * 1000 >= opens &&
             listing.endsAt * 1000 <= closes,
         )
+        // Soonest first: the one to deal with is the one about to go.
+        .sort((a, b) => a.endsAt - b.endsAt)
         .map((listing) => ({
           listingId: listing.listingId,
           title: listing.title,

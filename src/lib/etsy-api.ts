@@ -267,6 +267,8 @@ export interface ShopListingSummary {
   createdAt: number;
   /** When Etsy retires the listing unless it renews, in epoch seconds. */
   endsAt: number;
+  /** Whether Etsy renews it automatically when that date arrives. */
+  autoRenews: boolean;
 }
 
 interface RawListing {
@@ -279,6 +281,7 @@ interface RawListing {
   original_creation_timestamp?: number;
   created_timestamp?: number;
   ending_timestamp?: number;
+  should_auto_renew?: boolean;
 }
 
 function toSummary(entry: RawListing): ShopListingSummary {
@@ -290,6 +293,7 @@ function toSummary(entry: RawListing): ShopListingSummary {
     imageCount: entry.images?.length ?? 0,
     createdAt: entry.original_creation_timestamp ?? entry.created_timestamp ?? 0,
     endsAt: entry.ending_timestamp ?? 0,
+    autoRenews: entry.should_auto_renew ?? false,
     // Etsy exposes favourites per listing but not views: there is no view or
     // visit count anywhere in the v3 schema, so "most looked at" cannot be
     // answered from the API at all.
