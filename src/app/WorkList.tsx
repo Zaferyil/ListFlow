@@ -3,15 +3,93 @@
 import { useEffect, useState } from "react";
 import type { SeasonGap, WorkItem } from "@/lib/worklist";
 import type { PriceBand } from "@/lib/shop-report";
+import type { CompetingGroup } from "@/lib/cannibalization";
 import { RewriteListing } from "./RewriteListing";
 
 interface Reply {
   worklist?: WorkItem[];
   gaps?: SeasonGap[];
   priceBand?: PriceBand | null;
+  competing?: CompetingGroup[];
   salesError?: string;
   error?: string;
   needsReconnect?: boolean;
+}
+
+/** What a listing has behind it, said in the order the evidence counts. */
+function evidence(entry: CompetingGroup["keep"]): string {
+  return [
+    entry.unitsSold > 0 ? `${entry.unitsSold} sold` : null,
+    entry.favorites > 0 ? `${entry.favorites} favourite${entry.favorites === 1 ? "" : "s"}` : null,
+    `${entry.imageCount} photo${entry.imageCount === 1 ? "" : "s"}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function EtsyLink({ listingId, title }: { listingId: number; title: string }) {
+  return (
+    <a href={`https://www.etsy.com/listing/${listingId}`} target="_blank" rel="noreferrer">
+      {title}
+    </a>
+  );
+}
+
+/**
+ * Listings in the shop chasing the same search as each other.
+ *
+ * Etsy shows one shop only so often for a given query, so these do not add up
+ * — they divide. Named by the words they share, so the grouping can be checked
+ * against the titles rather than taken on trust, and headed by the one with the
+ * most behind it, because splitting a query is only worth solving if something
+ * is kept whole.
+ */
+function CompetingGroups({ groups }: { groups: CompetingGroup[] }) {
+  const [limit, setLimit] = useState(5);
+  const crowded = groups.reduce((sum, group) => sum + group.others.length, 0);
+
+  return (
+    <section className="card">
+      <h3 style={{ marginTop: 0 }}>Listings competing with each other ({groups.length})</h3>
+      <p className="hint" style={{ marginTop: 0 }}>
+        Etsy shows one shop only so often for a given query, so listings built around the same
+        phrase do not double your chances — they split them, and the weakest drags on the rest.{" "}
+        <strong>{crowded}</strong> listings are sharing a query with a stronger one here.
+      </p>
+      <p className="hint">
+        The fix is rarely deletion. Give each one a different opening phrase and a different buyer —
+        the occasion, the recipient, the style — so they stop answering the same search. Where a
+        listing has nothing of its own to say, letting it end instead of renewing is a decision too.
+      </p>
+
+      <ul className="competing">
+        {groups.slice(0, limit).map((group) => (
+          <li key={group.keep.listingId}>
+            <span className="competing-phrase">{group.phrase}</span>
+            <div className="competing-keep">
+              <span className="competing-tag">Keep</span>
+              <EtsyLink listingId={group.keep.listingId} title={group.keep.title} />
+              <span className="work-why">{evidence(group.keep)}</span>
+            </div>
+            <ul>
+              {group.others.map((other) => (
+                <li key={other.listingId}>
+                  <EtsyLink listingId={other.listingId} title={other.title} />
+                  <span className="work-why">{evidence(other)}</span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+
+      {groups.length > limit && (
+        <button type="button" className="ghost" onClick={() => setLimit(limit + 10)}>
+          Show more — {groups.length - limit} further groups
+        </button>
+      )}
+    </section>
+  );
 }
 
 /**
@@ -139,6 +217,10 @@ export function WorkList() {
           </button>
         )}
       </div>
+
+      {(reply.competing ?? []).length > 0 && (
+        <CompetingGroups groups={reply.competing ?? []} />
+      )}
 
       {gaps.length > 0 && (
         <section className="card">

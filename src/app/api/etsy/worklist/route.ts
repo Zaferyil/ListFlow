@@ -3,6 +3,7 @@ import { getShop, getShopListings, getShopSales, isEtsyConfigured } from "@/lib/
 import { getAccessToken } from "@/lib/etsy-tokens";
 import { auditListings, priceBandOf } from "@/lib/shop-report";
 import { buildWorklist, seasonGaps } from "@/lib/worklist";
+import { competingGroups } from "@/lib/cannibalization";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -58,6 +59,18 @@ export async function GET() {
       worklist: buildWorklist(candidates, new Date(), band),
       priceBand: band,
       gaps: seasonGaps(listings.map((listing) => listing.title)),
+      // Run off the listings already fetched above, so the whole shop is
+      // checked against itself without a second read of it.
+      competing: competingGroups(
+        listings.map((listing) => ({
+          listingId: listing.listingId,
+          title: listing.title,
+          tags: listing.tags,
+          unitsSold: sold.get(listing.listingId) ?? 0,
+          favorites: listing.favorites,
+          imageCount: listing.imageCount,
+        })),
+      ),
       salesError,
     });
   } catch (error) {
