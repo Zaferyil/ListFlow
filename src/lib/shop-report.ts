@@ -38,6 +38,8 @@ export interface AuditedListing {
   listingId: number;
   title: string;
   warnings: ListingWarning[];
+  /** When Etsy last saw this listing change, in epoch seconds. */
+  updatedAt: number;
 }
 
 /**
@@ -92,12 +94,14 @@ export function auditListings(
     imageCount: number;
     favorites: number;
     createdAt: number;
+    updatedAt: number;
   }[],
 ): AuditedListing[] {
   return listings
     .map((listing) => ({
       listingId: listing.listingId,
       title: listing.title,
+      updatedAt: listing.updatedAt,
       warnings: listingHealth(listing).concat(inspectListing({
         title: listing.title,
         description: listing.description,

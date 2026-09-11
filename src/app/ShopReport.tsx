@@ -100,6 +100,28 @@ function ListingRows({
 }
 
 /**
+ * When a listing last changed, said the way it is asked about.
+ *
+ * Recent edits are read as "how long ago" — that is the question while working
+ * through a list — and anything older as a date, where the day of the week it
+ * happened stopped mattering.
+ */
+function lastEdited(epochSeconds: number): string {
+  if (!epochSeconds) return "";
+
+  const days = Math.floor((Date.now() / 1000 - epochSeconds) / 86_400);
+  if (days <= 0) return "edited today";
+  if (days === 1) return "edited yesterday";
+  if (days < 30) return `edited ${days} days ago`;
+
+  return `edited ${new Date(epochSeconds * 1000).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`;
+}
+
+/**
  * The listing id inside whatever was pasted.
  *
  * Reaching for a particular listing, the thing to hand is its URL — from the
@@ -178,6 +200,9 @@ function AuditRows({ audit }: { audit: AuditedListing[] }) {
                 )}
                 {entry.title}
               </a>
+              {entry.updatedAt > 0 && (
+                <span className="audit-edited">{lastEdited(entry.updatedAt)}</span>
+              )}
               <ul>
                 {entry.warnings.map((warning) => (
                   <li key={`${warning.field}-${warning.message}`}>{warning.message}</li>

@@ -269,6 +269,12 @@ export interface ShopListingSummary {
   endsAt: number;
   /** Whether Etsy renews it automatically when that date arrives. */
   autoRenews: boolean;
+  /**
+   * Etsy's own record of when the listing last changed, in epoch seconds.
+   * Read rather than remembered locally, so it survives a different browser and
+   * counts edits made on Etsy itself, not only the ones made here.
+   */
+  updatedAt: number;
 }
 
 interface RawListing {
@@ -282,6 +288,8 @@ interface RawListing {
   created_timestamp?: number;
   ending_timestamp?: number;
   should_auto_renew?: boolean;
+  last_modified_timestamp?: number;
+  updated_timestamp?: number;
 }
 
 function toSummary(entry: RawListing): ShopListingSummary {
@@ -294,6 +302,7 @@ function toSummary(entry: RawListing): ShopListingSummary {
     createdAt: entry.original_creation_timestamp ?? entry.created_timestamp ?? 0,
     endsAt: entry.ending_timestamp ?? 0,
     autoRenews: entry.should_auto_renew ?? false,
+    updatedAt: entry.last_modified_timestamp ?? entry.updated_timestamp ?? 0,
     // Etsy exposes favourites per listing but not views: there is no view or
     // visit count anywhere in the v3 schema, so "most looked at" cannot be
     // answered from the API at all.

@@ -1093,3 +1093,11 @@ a:hover {
   color: var(--accent);
   text-decoration-color: currentColor;
 }
+
+/* When this listing last changed — read from Etsy, so it holds across reloads
+   and across browsers, and counts edits made on Etsy itself. */
+.audit-edited {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
