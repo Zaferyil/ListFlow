@@ -146,7 +146,21 @@ function listingIdIn(term: string): number | null {
  * they had reached. Searching finds a particular listing; showing more
  * continues down the queue.
  */
-function AuditRows({ audit }: { audit: AuditedListing[] }) {
+function AuditRows({
+  audit,
+  allListings,
+}: {
+  audit: AuditedListing[];
+  /**
+   * Every live listing, not only the ones with a finding against them.
+   *
+   * Searching the audit alone meant a listing that passed every check could not
+   * be found at all — the one answer the seller could not tell apart from a
+   * broken search. Looking one up and rewriting it are reasons enough to reach
+   * a clean listing.
+   */
+  allListings: ListingPerformance[];
+}) {
   const [limit, setLimit] = useState(15);
   const [search, setSearch] = useState("");
   // Which listings this visit has changed. The audit itself is a snapshot taken
@@ -163,6 +177,20 @@ function AuditRows({ audit }: { audit: AuditedListing[] }) {
       : audit.filter((entry) => entry.title.toLowerCase().includes(term));
   const visible = matching.slice(0, limit);
 
+  // Nothing flagged under that search, so look at the shop itself before
+  // reporting a miss: a listing with no findings is a result, not an absence.
+  const flagged = new Set(audit.map((entry) => entry.listingId));
+  const clean =
+    term && matching.length === 0
+      ? allListings.filter(
+          (entry) =>
+            !flagged.has(entry.listingId) &&
+            (wantedId !== null
+              ? entry.listingId === wantedId
+              : entry.title.toLowerCase().includes(term)),
+        )
+      : [];
+
   return (
     <>
       <div className="field">
@@ -176,14 +204,42 @@ function AuditRows({ audit }: { audit: AuditedListing[] }) {
           }}
           placeholder="Paste a listing URL, or search by title"
         />
+        <p className="hint" style={{ margin: "0.3rem 0 0" }}>
+          Searches every live listing, not only the ones flagged below.
+        </p>
       </div>
 
-      {matching.length === 0 && (
+      {matching.length === 0 && clean.length === 0 && term && (
         <p className="hint">
           {wantedId !== null
-            ? `Nothing audited under listing ${wantedId}. Only listings that fall short of a check appear here, so it may have passed all of them — or it may not be live.`
-            : "No listing title matches that. Paste the listing's URL to find it exactly."}
+            ? `Listing ${wantedId} is not among your live listings. It may have ended, sold out, or belong to your other shop.`
+            : "No live listing's title matches that. Paste the listing's URL to find it exactly."}
         </p>
+      )}
+
+      {clean.length > 0 && (
+        <ul className="report-rows audit-rows">
+          {clean.slice(0, limit).map((entry) => (
+            <li key={entry.listingId}>
+              <a
+                href={`https://www.etsy.com/listing/${entry.listingId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {entry.title}
+              </a>
+              <p className="hint" style={{ margin: "0.35rem 0 0" }}>
+                This listing passes every check, which is why it is not in the audit above. You can
+                still rewrite it — but it has nothing against it, so there is less to gain and the
+                search history it has earned is real.
+              </p>
+              <RewriteListing
+                listingId={entry.listingId}
+                onApplied={() => setUpdated((current) => [...current, entry.listingId])}
+              />
+            </li>
+          ))}
+        </ul>
       )}
 
       <ul className="report-rows audit-rows">
@@ -354,7 +410,7 @@ export function ShopReport() {
             yourself, and start with those that earn nothing. Rewriting shows both versions side by
             side and changes nothing on Etsy until you accept it.
           </p>
-          <AuditRows audit={audit} />
+          <AuditRows audit={audit} allListings={report.listings} />
         </section>
       )}
 
