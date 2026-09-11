@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { SeasonGap, WorkItem } from "@/lib/worklist";
+import { RewriteListing } from "./RewriteListing";
 
 interface Reply {
   worklist?: WorkItem[];
@@ -22,6 +23,10 @@ interface Reply {
 export function WorkList() {
   const [reply, setReply] = useState<Reply | null>(null);
   const [limit, setLimit] = useState(10);
+  // Which listings this visit has rewritten. The queue was worked out when the
+  // page loaded, so it still describes the version each rewrite replaced — the
+  // entry says which of them that is now true of.
+  const [updated, setUpdated] = useState<number[]>([]);
 
   useEffect(() => {
     fetch("/api/etsy/worklist")
@@ -67,7 +72,8 @@ export function WorkList() {
           Your listings in the order worth picking them up, weighing the season against how much
           each has to gain. Listings that have sold are left out entirely: Etsy weighs a listing&apos;s
           own history, and there is no version of improving one that is worth risking what already
-          works.
+          works. Where the wording is the fault, the rewrite sits on the entry itself — it shows
+          both versions and changes nothing on Etsy until you accept it.
         </p>
 
         {worklist.length === 0 && (
@@ -75,23 +81,42 @@ export function WorkList() {
         )}
 
         <ol className="worklist">
-          {worklist.slice(0, limit).map((item) => (
-            <li key={item.listingId}>
-              <a
-                href={`https://www.etsy.com/listing/${item.listingId}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {item.title}
-              </a>
-              <span className="work-why">{item.reasons.join(" · ")}</span>
-              <ul>
-                {item.actions.map((action) => (
-                  <li key={action}>{action}</li>
-                ))}
-              </ul>
-            </li>
-          ))}
+          {worklist.slice(0, limit).map((item) => {
+            const isUpdated = updated.includes(item.listingId);
+            return (
+              <li key={item.listingId} className={isUpdated ? "updated" : undefined}>
+                <a
+                  href={`https://www.etsy.com/listing/${item.listingId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {isUpdated && (
+                    <span className="updated-badge" aria-label="Updated">
+                      ✓
+                    </span>
+                  )}
+                  {item.title}
+                </a>
+                <span className="work-why">{item.reasons.join(" · ")}</span>
+                <ul>
+                  {item.actions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
+                {/*
+                  Offered only where the wording is what is wrong. A listing
+                  held back by its photos gains nothing from new words, and
+                  rewriting it spends the search history it has earned.
+                */}
+                {item.findings > 0 && (
+                  <RewriteListing
+                    listingId={item.listingId}
+                    onApplied={() => setUpdated((current) => [...current, item.listingId])}
+                  />
+                )}
+              </li>
+            );
+          })}
         </ol>
 
         {worklist.length > limit && (

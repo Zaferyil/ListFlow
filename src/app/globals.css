@@ -1135,3 +1135,26 @@ a:hover {
   padding-left: 1.1rem;
   font-size: 0.85rem;
 }
+
+/* Each entry is its own panel, because a rewrite opens inside one: without a
+   boundary the two versions of a listing run straight into the next entry's
+   title, and the queue stops reading as a list of separate jobs. */
+.worklist > li {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--surface-sunken);
+}
+
+/* A listing this visit has rewritten. The reasons above it still describe the
+   version it replaced — the queue was worked out at page load — so they are
+   dimmed rather than removed. */
+.worklist > li.updated {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.worklist > li.updated > ul,
+.worklist > li.updated > .work-why {
+  opacity: 0.5;
+}

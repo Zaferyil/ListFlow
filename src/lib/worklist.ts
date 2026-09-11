@@ -34,6 +34,14 @@ export interface WorkItem {
   reasons: string[];
   /** What to do about it, most useful first. */
   actions: string[];
+  /**
+   * How many findings the audit raised against its wording.
+   *
+   * Carried through so the queue can offer a rewrite exactly where one is the
+   * answer. A listing held back by its photos is not helped by new words, and
+   * rewriting it spends the search history it has earned for nothing.
+   */
+  findings: number;
 }
 
 /** Photos the listings that sell in a shop like this one carry. */
@@ -148,6 +156,7 @@ export function buildWorklist(candidates: WorkCandidate[], now = new Date()): Wo
     title: candidate.title,
     reasons,
     actions,
+    findings: candidate.findings,
   }));
 }
 
