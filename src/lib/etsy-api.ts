@@ -275,6 +275,17 @@ export interface ShopListingSummary {
    * counts edits made on Etsy itself, not only the ones made here.
    */
   updatedAt: number;
+  /**
+   * What the listing asks, in the shop's currency.
+   *
+   * A listing that is favourited and never bought has already been found and
+   * wanted; what happened after that is price, photos or postage, and price is
+   * the one Etsy will tell us. Reporting "look at the price" without showing it
+   * left the seller to open every listing to do the looking.
+   */
+  price: number;
+  /** The currency that price is in, as Etsy states it per listing. */
+  currency: string;
 }
 
 interface RawListing {
@@ -290,6 +301,7 @@ interface RawListing {
   should_auto_renew?: boolean;
   last_modified_timestamp?: number;
   updated_timestamp?: number;
+  price?: unknown;
 }
 
 function toSummary(entry: RawListing): ShopListingSummary {
@@ -303,6 +315,11 @@ function toSummary(entry: RawListing): ShopListingSummary {
     endsAt: entry.ending_timestamp ?? 0,
     autoRenews: entry.should_auto_renew ?? false,
     updatedAt: entry.last_modified_timestamp ?? entry.updated_timestamp ?? 0,
+    // A listing with variations prices them per option; what Etsy returns here
+    // is the lowest of those, which is also the figure a buyer sees in search.
+    price: money(entry.price),
+    currency:
+      (entry.price as { currency_code?: string } | undefined)?.currency_code ?? "USD",
     // Etsy exposes favourites per listing but not views: there is no view or
     // visit count anywhere in the v3 schema, so "most looked at" cannot be
     // answered from the API at all.

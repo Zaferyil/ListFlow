@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import type { SeasonGap, WorkItem } from "@/lib/worklist";
+import type { PriceBand } from "@/lib/shop-report";
 import { RewriteListing } from "./RewriteListing";
 
 interface Reply {
   worklist?: WorkItem[];
   gaps?: SeasonGap[];
+  priceBand?: PriceBand | null;
   salesError?: string;
   error?: string;
   needsReconnect?: boolean;
@@ -75,6 +77,18 @@ export function WorkList() {
           works. Where the wording is the fault, the rewrite sits on the entry itself — it shows
           both versions and changes nothing on Etsy until you accept it.
         </p>
+
+        {reply.priceBand && (
+          <p className="hint">
+            Prices here are weighed against what your buyers have actually paid:{" "}
+            <strong>
+              ${reply.priceBand.low.toFixed(2)}–${reply.priceBand.high.toFixed(2)}
+            </strong>
+            , usually around ${reply.priceBand.median.toFixed(2)}, across the{" "}
+            {reply.priceBand.from} listings that have sold. A listing asking more than anything in
+            that range is not wrong, but it is the cheapest thing on this list to test.
+          </p>
+        )}
 
         {worklist.length === 0 && (
           <p className="hint">Nothing pressing. Every listing either sells or has no fault to fix.</p>

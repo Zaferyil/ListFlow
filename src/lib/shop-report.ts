@@ -17,6 +17,7 @@ export interface ShopListingSummary {
   favorites: number;
   imageCount: number;
   createdAt: number;
+  price: number;
 }
 
 /**
@@ -135,6 +136,49 @@ export interface ListingPerformance {
   imageCount: number;
   /** Days live. Zero when Etsy gave no creation date. */
   ageDays: number;
+  /** What it asks, in the shop's currency. */
+  price: number;
+}
+
+/**
+ * What this shop's buyers have actually paid.
+ *
+ * General advice about pricing is worth little — the number that matters is not
+ * what Etsy sellers charge but what *these* buyers have agreed to, and the shop
+ * already knows it. Drawn only from listings that sold, so it is evidence
+ * rather than aspiration.
+ */
+export interface PriceBand {
+  low: number;
+  high: number;
+  median: number;
+  /** How many sold listings it is drawn from. */
+  from: number;
+}
+
+/**
+ * Too few sales and the "band" is one lucky listing restated as a rule.
+ * Three is not many, but it is the point where a range starts to mean range.
+ */
+const BAND_MINIMUM = 3;
+
+export function priceBandOf(listings: { price: number; unitsSold: number }[]): PriceBand | null {
+  const prices = listings
+    .filter((entry) => entry.unitsSold > 0)
+    .map((entry) => entry.price)
+    .filter((price) => price > 0)
+    .sort((a, b) => a - b);
+
+  if (prices.length < BAND_MINIMUM) return null;
+
+  const middle = Math.floor(prices.length / 2);
+  return {
+    low: prices[0],
+    high: prices[prices.length - 1],
+    median:
+      prices.length % 2 === 0 ? (prices[middle - 1] + prices[middle]) / 2 : prices[middle],
+    from: prices.length,
+  };
 }
 
 export interface ShopReport {
@@ -149,6 +193,8 @@ export interface ShopReport {
   favoritedNeverSold: ListingPerformance[];
   /** Neither favourited nor sold — nothing is reaching these at all. */
   unnoticed: ListingPerformance[];
+  /** What this shop's buyers have paid, or null when too few have. */
+  priceBand: PriceBand | null;
 }
 
 /** Favourites worth calling interest rather than noise. */
@@ -183,6 +229,7 @@ export function buildShopReport(
       revenue: result?.revenue ?? 0,
       imageCount: listing.imageCount,
       ageDays: ageInDays(listing.createdAt),
+      price: listing.price,
     };
   });
 
@@ -207,5 +254,6 @@ export function buildShopReport(
     unnoticed: performance
       .filter((entry) => entry.unitsSold === 0 && entry.favorites === 0)
       .sort((a, b) => b.ageDays - a.ageDays),
+    priceBand: priceBandOf(performance),
   };
 }

@@ -14,6 +14,7 @@
  */
 
 import { OCCASIONS } from "./season";
+import type { PriceBand } from "./shop-report";
 
 export interface WorkCandidate {
   listingId: number;
@@ -25,6 +26,8 @@ export interface WorkCandidate {
   createdAt: number;
   /** How many findings the audit raised against its wording. */
   findings: number;
+  /** What it asks, in the shop's currency. */
+  price: number;
 }
 
 export interface WorkItem {
@@ -91,7 +94,14 @@ function seasonFor(title: string, now: Date): { name: string; daysToBuying: numb
  * interest after months live, a title that breaks the rules — says how much
  * there is to gain once you are there.
  */
-export function buildWorklist(candidates: WorkCandidate[], now = new Date()): WorkItem[] {
+export function buildWorklist(
+  candidates: WorkCandidate[],
+  now = new Date(),
+  /** What this shop's buyers have paid, when enough of them have. */
+  band: PriceBand | null = null,
+): WorkItem[] {
+  const price = (amount: number) => `$${amount.toFixed(2)}`;
+
   const scored = candidates
     // A listing that sells is not a problem to solve.
     .filter((candidate) => candidate.unitsSold === 0)
@@ -126,15 +136,35 @@ export function buildWorklist(candidates: WorkCandidate[], now = new Date()): Wo
         actions.push(`Add photos — ${candidate.imageCount} now, and the ones that sell have eight or more.`);
       }
 
+      // Priced beyond anything this shop has ever sold. Not wrong in itself —
+      // but it is a claim the shop has no evidence for, and it is the cheapest
+      // thing on this list to test.
+      const aboveBand = Boolean(band && candidate.price > band.high);
+      if (aboveBand && band) {
+        score += 20;
+        reasons.push(`${price(candidate.price)} — above everything that has sold here`);
+      }
+
       const age = ageInDays(candidate.createdAt);
       if (candidate.favorites === 0 && age >= SETTLED_DAYS) {
         score += 25;
         reasons.push(`live ${age} days without a single favourite`);
       } else if (candidate.favorites > 0) {
         score += 15;
-        reasons.push(`${candidate.favorites} favourites but no sale`);
+        reasons.push(`${candidate.favorites} favourite${candidate.favorites === 1 ? "" : "s"} but no sale`);
         actions.push(
-          "Buyers are finding this and stopping short of buying. Look at the price and the photos before the wording.",
+          band
+            ? `Buyers are finding this and stopping short of buying, so the problem is after the search: price, photos or postage. It asks ${price(candidate.price)}; what has actually sold here went for ${price(band.low)}–${price(band.high)}, usually around ${price(band.median)}.`
+            : "Buyers are finding this and stopping short of buying. Look at the price and the photos before the wording.",
+        );
+      }
+
+      // Said on its own where no favourite made the point already — otherwise
+      // the entry would raise the price as a reason and then offer nothing to
+      // do about it.
+      if (aboveBand && band && candidate.favorites === 0) {
+        actions.push(
+          `It asks ${price(candidate.price)}, and nothing above ${price(band.high)} has ever sold in this shop. Try it nearer ${price(band.median)}, where your buyers have actually bought.`,
         );
       }
 

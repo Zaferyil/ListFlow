@@ -76,6 +76,9 @@ function ListingRows({
           </a>
           <span>
             {[
+              // The asking price leads, because for a listing that never sold
+              // it is the figure the rest of the row is evidence about.
+              entry.price > 0 ? money(entry.price, currency) : null,
               showRevenue ? money(entry.revenue, currency) : null,
               entry.unitsSold > 0 ? `${entry.unitsSold} sold` : null,
               entry.favorites > 0 ? `${entry.favorites} favourites` : null,
@@ -288,6 +291,16 @@ export function ShopReport() {
             unavailable={salesUnknown}
           />
         </div>
+        {report.priceBand && (
+          <p className="hint">
+            <strong>What your buyers pay:</strong>{" "}
+            {money(report.priceBand.low, report.currency)}–
+            {money(report.priceBand.high, report.currency)}, usually around{" "}
+            {money(report.priceBand.median, report.currency)}, across the {report.priceBand.from}{" "}
+            listings that have sold. This is your own evidence rather than general advice about
+            pricing: it says what these buyers have agreed to, not what Etsy sellers charge.
+          </p>
+        )}
         <p className="hint">
           Favourites and sales come from Etsy&apos;s API. Views, visits and follower counts are not
           in it at all — those stay in your Etsy dashboard.
@@ -319,7 +332,9 @@ export function ShopReport() {
           <p className="hint" style={{ marginTop: 0 }}>
             {salesUnknown
               ? "Favourited listings. Whether any of them sold cannot be read on this connection, so treat this as \u201cfavourited\u201d rather than \u201cnever sold\u201d until sales access is granted."
-              : "Buyers found these and wanted them, then did not buy. The listing is reaching people; something after that — price, photos, shipping cost — is losing them."}
+              : report.priceBand
+                ? `Buyers found these and wanted them, then did not buy. The listing is reaching people; something after that — price, photos, shipping cost — is losing them. Each row leads with what it asks: compare it against the ${money(report.priceBand.low, report.currency)}–${money(report.priceBand.high, report.currency)} your buyers have actually paid.`
+                : "Buyers found these and wanted them, then did not buy. The listing is reaching people; something after that — price, photos, shipping cost — is losing them."}
           </p>
           <ListingRows
             listings={report.favoritedNeverSold}

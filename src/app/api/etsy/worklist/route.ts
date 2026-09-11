@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getShop, getShopListings, getShopSales, isEtsyConfigured } from "@/lib/etsy-api";
 import { getAccessToken } from "@/lib/etsy-tokens";
-import { auditListings } from "@/lib/shop-report";
+import { auditListings, priceBandOf } from "@/lib/shop-report";
 import { buildWorklist, seasonGaps } from "@/lib/worklist";
 
 export const runtime = "nodejs";
@@ -38,18 +38,25 @@ export async function GET() {
       auditListings(listings).map((entry) => [entry.listingId, entry.warnings.length]),
     );
 
+    const candidates = listings.map((listing) => ({
+      listingId: listing.listingId,
+      title: listing.title,
+      favorites: listing.favorites,
+      unitsSold: sold.get(listing.listingId) ?? 0,
+      imageCount: listing.imageCount,
+      createdAt: listing.createdAt,
+      findings: findings.get(listing.listingId) ?? 0,
+      price: listing.price,
+    }));
+
+    // What this shop's buyers have actually paid, which is a better guide to
+    // what they will pay than any general advice about pricing. Absent when
+    // sales could not be read — a band drawn from no sales is a made-up one.
+    const band = priceBandOf(candidates);
+
     return NextResponse.json({
-      worklist: buildWorklist(
-        listings.map((listing) => ({
-          listingId: listing.listingId,
-          title: listing.title,
-          favorites: listing.favorites,
-          unitsSold: sold.get(listing.listingId) ?? 0,
-          imageCount: listing.imageCount,
-          createdAt: listing.createdAt,
-          findings: findings.get(listing.listingId) ?? 0,
-        })),
-      ),
+      worklist: buildWorklist(candidates, new Date(), band),
+      priceBand: band,
       gaps: seasonGaps(listings.map((listing) => listing.title)),
       salesError,
     });
