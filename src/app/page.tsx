@@ -7,10 +7,11 @@ import { DropZone } from "./DropZone";
 import { EtsyPanel } from "./EtsyPanel";
 import { ListingCard } from "./ListingCard";
 import { SeasonCalendar } from "./SeasonCalendar";
+import { WorkList } from "./WorkList";
 import { ShopReport } from "./ShopReport";
 import { FOR_ANALYSIS, prepareForUpload } from "./shrink";
 
-type Tab = "design" | "niche" | "sheet" | "shop" | "season";
+type Tab = "design" | "niche" | "sheet" | "shop" | "season" | "todo";
 
 interface SingleResult {
   listing: Listing;
@@ -566,6 +567,7 @@ const TABS: { id: Tab; label: string; short: string }[] = [
   { id: "sheet", label: "Google Sheet", short: "Sheet" },
   { id: "shop", label: "Shop report", short: "Shop" },
   { id: "season", label: "Season calendar", short: "Season" },
+  { id: "todo", label: "What to do next", short: "To do" },
 ];
 
 export default function Home() {
@@ -614,7 +616,7 @@ export default function Home() {
           ))}
         </div>
 
-        {tab !== "shop" && tab !== "season" && (
+        {tab !== "shop" && tab !== "season" && tab !== "todo" && (
           <Step
             number={1}
             title="Blank"
@@ -629,6 +631,7 @@ export default function Home() {
         {tab === "sheet" && <SheetTab productId={productId} />}
         {tab === "shop" && <ShopReport />}
         {tab === "season" && <SeasonCalendar />}
+        {tab === "todo" && <WorkList />}
       </main>
     </>
   );

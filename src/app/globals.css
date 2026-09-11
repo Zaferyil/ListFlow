@@ -1101,3 +1101,37 @@ a:hover {
   color: var(--muted);
   margin-top: 0.15rem;
 }
+
+/* What to do next --------------------------------------------------------- */
+
+.worklist {
+  margin: 1rem 0 0;
+  padding-left: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.worklist > li::marker {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.worklist > li > a {
+  display: block;
+  font-weight: 550;
+}
+
+/* Why this listing sits where it does — the working behind the ranking. */
+.work-why {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.1rem;
+}
+
+.worklist ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
