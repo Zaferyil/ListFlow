@@ -173,10 +173,17 @@ export function WorkList() {
         )}
 
         <ol className="worklist">
-          {worklist.slice(0, limit).map((item) => {
+          {worklist.slice(0, limit).map((item, index) => {
             const isUpdated = updated.includes(item.listingId);
             return (
               <li key={item.listingId} className={isUpdated ? "updated" : undefined}>
+                {/*
+                  The rank is drawn rather than left to ::marker, which sits
+                  outside the entry's panel: by the time a shop is a few hundred
+                  listings deep the number is three digits wide, and on a phone
+                  it hangs off the card and into the page margin.
+                */}
+                <span className="work-rank">{index + 1}</span>
                 <a
                   href={`https://www.etsy.com/listing/${item.listingId}`}
                   target="_blank"

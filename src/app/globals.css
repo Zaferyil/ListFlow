@@ -640,8 +640,14 @@ button.linklike {
     font-size: 0.9rem;
   }
 
+  /*
+   * Six tabs sharing the width. They shrink to fit, but "nowrap" gives each a
+   * floor, and below about 360px the row hits it and pushes the page wider than
+   * the screen — every card on it then scrolls sideways to make room for the
+   * tabs. Letting the bar scroll its own overflow keeps that to the bar.
+   */
   .tabs {
-    overflow-x: visible;
+    overflow-x: auto;
   }
 
   .tabs button {
@@ -869,12 +875,26 @@ button.linklike {
   flex: 1 1 14rem;
   min-width: 0;
   font-weight: 550;
+  /* An Etsy title is a run of comma-separated phrases and breaks at its spaces,
+     but a pasted slug or a hashtag has none, and one long word with nowhere to
+     break widens the row until the whole page scrolls sideways. */
+  overflow-wrap: anywhere;
 }
 
+/*
+ * The figures beside a title.
+ *
+ * These were held on one line, which was right when the line was a price and a
+ * count. It is now five parts — price, revenue, units, favourites, age, photos
+ * — and on a phone an unbreakable five-part line does not overflow its own row
+ * quietly: it widens the page and every card on it scrolls sideways together.
+ * So it wraps, and on a wide screen there is room enough that it still does not.
+ */
 .report-rows span {
   font-size: 0.85rem;
   color: var(--muted);
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* An audited listing carries its own list of failures, so the row stacks
@@ -1083,13 +1103,17 @@ a:hover {
  * it takes the reading colour and says it is clickable with the underline. The
  * accent is saved for hover, where it marks the one under the cursor.
  */
-.report-rows > li > a {
+.report-rows > li > a,
+.worklist > li > a,
+.competing a {
   color: var(--text);
   text-decoration-color: var(--border-strong);
   text-underline-offset: 2px;
 }
 
-.report-rows > li > a:hover {
+.report-rows > li > a:hover,
+.worklist > li > a:hover,
+.competing a:hover {
   color: var(--accent);
   text-decoration-color: currentColor;
 }
@@ -1105,21 +1129,29 @@ a:hover {
 /* What to do next --------------------------------------------------------- */
 
 .worklist {
+  list-style: none;
   margin: 1rem 0 0;
-  padding-left: 1.4rem;
+  padding-left: 0;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.worklist > li::marker {
-  color: var(--muted);
+/* The position in the queue, drawn inside the entry. See WorkList.tsx: the
+   list marker sits outside the panel and hangs into the page margin once the
+   number reaches three digits. */
+.work-rank {
+  display: inline-block;
+  margin-right: 0.4rem;
+  font-size: 0.78rem;
   font-weight: 650;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .worklist > li > a {
-  display: block;
   font-weight: 550;
+  overflow-wrap: anywhere;
 }
 
 /* Why this listing sits where it does — the working behind the ranking. */
@@ -1220,4 +1252,54 @@ a:hover {
 
 .competing ul a {
   display: block;
+}
+
+.competing a {
+  overflow-wrap: anywhere;
+}
+
+/* Narrow screens ---------------------------------------------------------- */
+
+/*
+ * The shop, season and queue pages are lists of long Etsy titles inside nested
+ * panels, and each level of nesting spends width the phone does not have. At
+ * 420px the padding is trimmed rather than the content, so a title still gets
+ * the room to wrap instead of the row getting the room to overflow.
+ */
+@media (max-width: 420px) {
+  /* Six tabs, and the sixth is the newest page. Tightened so the whole set is
+     reachable without discovering that the bar scrolls. */
+  .tabs {
+    gap: 0.15rem;
+    padding: 0.25rem;
+  }
+
+  .tabs button {
+    padding: 0.5rem 0.3rem;
+    font-size: 0.8rem;
+  }
+
+  .worklist > li,
+  .competing > li,
+  .audit-rows > li {
+    padding: 0.7rem 0.6rem;
+  }
+
+  .competing ul,
+  .audit-rows li ul,
+  .worklist ul {
+    padding-left: 0.9rem;
+  }
+
+  .season-expiry {
+    padding-left: 0.5rem;
+  }
+
+  /* "Show more — 198 still hidden" is a whole sentence on a button; let it
+     wrap rather than stretch the card it sits in. */
+  .worklist + button,
+  .card > button.ghost {
+    white-space: normal;
+    text-align: left;
+  }
 }
