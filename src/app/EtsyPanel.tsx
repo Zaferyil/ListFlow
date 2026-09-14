@@ -181,14 +181,61 @@ const ORNAMENT_LAYOUT = 2;
  * "2XL = 26.99" per line. Etsy lets price vary on one property only, and for
  * these blanks that property is size — the same colour costs more in 2XL.
  */
+/**
+ * A price as a person writes one.
+ *
+ * `Number()` alone reads "54.99" and nothing else: a currency symbol, a space
+ * before it, or a comma for the decimal point all give NaN, the line is
+ * dropped, and the effect is a Send button that will not light with no way to
+ * tell which of the fields above is at fault. Sellers pricing in euros type
+ * "54,99 €" because that is how the price is written where they are, and that
+ * is not a mistake the app should refuse to understand.
+ */
+function parsePrice(text: string): number {
+  const cleaned = text.replace(/[^\d.,]/g, "").trim();
+  if (!cleaned) return NaN;
+
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+
+  // Whichever separator comes last is the decimal point; anything earlier is
+  // grouping. "1.299,50" and "1,299.50" are the same money written two ways.
+  if (lastComma >= 0 && lastDot >= 0) {
+    const decimal = lastComma > lastDot ? "," : ".";
+    const grouping = decimal === "," ? "." : ",";
+    return Number(cleaned.split(grouping).join("").replace(decimal, "."));
+  }
+
+  // A lone comma is a decimal point when two digits follow it — "54,99" — and a
+  // thousands separator otherwise, as in "1,299".
+  if (lastComma >= 0) {
+    return Number(
+      /,\d{1,2}$/.test(cleaned) ? cleaned.replace(",", ".") : cleaned.split(",").join(""),
+    );
+  }
+
+  return Number(cleaned);
+}
+
 function parseSizes(text: string): { name: string; price: number }[] {
   return text
     .split("\n")
     .map((line) => {
       const [name, price] = line.split("=");
-      return { name: (name ?? "").trim(), price: Number((price ?? "").trim()) };
+      return { name: (name ?? "").trim(), price: parsePrice(price ?? "") };
     })
     .filter((size) => size.name && size.price > 0);
+}
+
+/** Lines the seller wrote that the parser could make nothing of. */
+function unreadableSizeLines(text: string): string[] {
+  return text
+    .split("\n")
+    .filter((line) => line.trim())
+    .filter((line) => {
+      const [name, price] = line.split("=");
+      return !((name ?? "").trim() && parsePrice(price ?? "") > 0);
+    });
 }
 
 function parseColors(text: string): string[] {
@@ -530,6 +577,7 @@ export function EtsyPanel({
   const processingProfiles = status.processingProfiles ?? [];
   const competitors = listing ? competingListings(listing, shopListings) : [];
   const sizeCount = parseSizes(settings.sizesText).length;
+  const unreadableSizes = unreadableSizeLines(settings.sizesText);
   const colorCount = parseColors(settings.colorsText).length;
   const offeringCount = sizeCount * Math.max(colorCount, 1);
   // A missing decimal point turns 49.99 into 4999 and reaches Etsy silently.
@@ -756,6 +804,25 @@ export function EtsyPanel({
               />
             </div>
           </div>
+          {unreadableSizes.length > 0 && (
+            <div className="alert warn">
+              <strong>
+                {unreadableSizes.length} line{unreadableSizes.length === 1 ? "" : "s"} could not be
+                read, so {unreadableSizes.length === 1 ? "it is" : "they are"} not being sent:
+              </strong>
+              <ul style={{ margin: "0.35rem 0 0", paddingLeft: "1.1rem" }}>
+                {unreadableSizes.slice(0, 5).map((line) => (
+                  <li key={line}>
+                    <code>{line.trim()}</code>
+                  </li>
+                ))}
+              </ul>
+              <p style={{ margin: "0.35rem 0 0" }}>
+                Each line needs a name, an <code>=</code>, and a price above zero —{" "}
+                <code>Unisex Sweatshirt / S = 54.99</code>. A currency symbol is fine.
+              </p>
+            </div>
+          )}
           {outliers.length > 0 && (
             <div className="alert warn">
               {outliers.map((size) => `${size.name} = ${size.price}`).join(", ")} —{" "}
@@ -999,11 +1066,31 @@ export function EtsyPanel({
         </button>
       </div>
 
+      {/*
+        The old message listed three fields and stopped there, so a panel with
+        all three filled in sat behind a disabled button with nothing to act on
+        — and the reason was usually the fourth thing, a variation run whose
+        prices would not parse. It now names what is actually missing.
+      */}
       {!ready && (
         <p className="hint">
-          {listing
-            ? "Pick a category, a processing profile and a price to enable sending."
-            : "Generate a listing in step 3 first — your settings above are saved."}
+          {!listing
+            ? "Generate a listing in step 3 first — your settings above are saved."
+            : `Still needed before sending: ${[
+                settings.taxonomyId === null ? "a category" : null,
+                settings.readinessStateId === null ? "a processing profile" : null,
+                Number(settings.price) > 0 ? null : "a price",
+                (settings.variationsOn || isOrnament) && settings.sizeLabel.trim().length === 0
+                  ? "a name for the first menu"
+                  : null,
+                (settings.variationsOn || isOrnament) && sizeCount === 0
+                  ? unreadableSizes.length > 0
+                    ? "at least one readable line under Values and prices — see the warning above"
+                    : "at least one line under Values and prices"
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(", ")}.`}
         </p>
       )}
       {error && <div className="alert error" style={{ marginTop: "1rem" }}>{error}</div>}
