@@ -7,7 +7,7 @@ import {
   type Listing,
   type ShopListing,
 } from "@/lib/etsy";
-import { findProduct, isOrnament as productIsOrnament } from "@/lib/products";
+import { findProduct, isOrnament as productIsOrnament, type Product } from "@/lib/products";
 import { FileDrop } from "./FileDrop";
 import { FOR_ETSY, prepareForUpload } from "./shrink";
 
@@ -254,11 +254,32 @@ function settingsKey(productId: string): string {
  * Saved settings win; the catalogue's colourways only prefill a blank the
  * seller has not set up yet, so editing the list is never undone by a reload.
  */
+/** The catalogue's run for a blank, as the editor's one-per-line text. */
+function catalogSizesText(product: Product): string | null {
+  return product.sizes?.length
+    ? product.sizes.map((size) => `${size.name} = ${size.price}`).join("\n")
+    : null;
+}
+
 function loadSettings(productId: string, catalogColors: string): PublishSettings {
-  const isOrnament = productIsOrnament(findProduct(productId));
+  const product = findProduct(productId);
+  const isOrnament = productIsOrnament(product);
+  const catalogSizes = catalogSizesText(product);
   const fallback = {
     ...DEFAULTS,
     colorsText: catalogColors,
+    // A blank that states its own run starts from it. The generic run in
+    // DEFAULTS is a placeholder for blanks nobody has priced yet, and for a
+    // blank that has been priced it is simply wrong.
+    ...(catalogSizes
+      ? {
+          sizesText: catalogSizes,
+          sizeLabel: product.sizeLabel ?? DEFAULTS.sizeLabel,
+          // A run that names its garments is one to offer, not to hide behind
+          // an unticked box.
+          variationsOn: true,
+        }
+      : {}),
     ...(isOrnament ? ORNAMENT_DEFAULTS : {}),
   };
   if (typeof window === "undefined") return fallback;

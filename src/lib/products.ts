@@ -54,6 +54,23 @@ export interface Product {
    */
   colors?: string[];
   /**
+   * The run this blank is sold in, and what it costs at each step.
+   *
+   * Kept here beside the colourways for the same reason: it is a property of
+   * the blank, not of one listing, and it is the same run every time. Held in
+   * the catalogue it is also the one copy nothing can clear — a seller's own
+   * edits still win, and still travel with their account, but a browser wiped
+   * clean comes back to this rather than to a generic list of sizes that was
+   * never right for this garment.
+   *
+   * Prices are what the seller charges, so they belong to the shop rather than
+   * to the blank; they are a starting point, editable in the panel like
+   * everything else here.
+   */
+  sizes?: { name: string; price: number }[];
+  /** What the first variation menu is called when this blank has its own run. */
+  sizeLabel?: string;
+  /**
    * Set when the buyer supplies text the seller prints — a name, a date, a
    * family list. Declared per blank because it is a property of the product,
    * not of one listing: it decides both what Etsy is told and whether the copy
@@ -122,6 +139,25 @@ export const PRODUCTS: Product[] = [
       "Violet",
       "Yam",
       "Seafoam",
+    ],
+    sizeLabel: "Size and Style",
+    sizes: [
+      { name: "Short Sleeve / S", price: 47.99 },
+      { name: "Short Sleeve / M", price: 47.99 },
+      { name: "Short Sleeve / L", price: 47.99 },
+      { name: "Short Sleeve / XL", price: 47.99 },
+      { name: "Short Sleeve / 2XL", price: 49.91 },
+      { name: "Short Sleeve / 3XL", price: 51.83 },
+      { name: "Long Sleeve / S", price: 52.79 },
+      { name: "Long Sleeve / M", price: 52.79 },
+      { name: "Long Sleeve / L", price: 52.79 },
+      { name: "Long Sleeve / XL", price: 52.79 },
+      { name: "Long Sleeve / 2XL", price: 54.71 },
+      { name: "Long Sleeve / 3XL", price: 56.63 },
+      { name: "Youth Short / S", price: 38.39 },
+      { name: "Youth Short / M", price: 38.39 },
+      { name: "Youth Short / L", price: 38.39 },
+      { name: "Youth Short / XL", price: 38.39 },
     ],
     source: "https://www.ssactivewear.com/p/comfort_colors/1717",
   },
