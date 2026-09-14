@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   competingListings,
   matchCategory,
@@ -323,10 +323,48 @@ export function EtsyPanel({
     window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
   }, []);
 
-  // Settings are per-blank, so switching blanks reloads that blank's saved values.
+  /**
+   * Settings are per-blank, so switching blanks reloads that blank's values.
+   *
+   * The browser's copy goes up first because it is already here — the panel
+   * fills in immediately rather than flashing empty fields at a seller who is
+   * mid-edit. Then the server's copy arrives and wins, since that is the one
+   * that survives a cleared browser and is shared with every other device.
+   *
+   * Where the server has nothing but this browser does, the browser's copy is
+   * sent up instead: settings typed before any of this existed are worth
+   * keeping, and the seller should not have to retype them to learn that.
+   */
   useEffect(() => {
-    setSettings(loadSettings(productId, catalogColors));
+    const local = loadSettings(productId, catalogColors);
+    setSettings(local);
     setResult(null);
+
+    let current = true;
+    fetch(`/api/etsy/settings?productId=${encodeURIComponent(productId)}`)
+      .then((response) => response.json())
+      .then((body) => {
+        if (!current) return;
+
+        if (body.settings) {
+          const merged = { ...local, ...(body.settings as Partial<PublishSettings>) };
+          setSettings(merged);
+          window.localStorage.setItem(settingsKey(productId), JSON.stringify(merged));
+        } else if (window.localStorage.getItem(settingsKey(productId))) {
+          void fetch(`/api/etsy/settings?productId=${encodeURIComponent(productId)}`, {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(local),
+          });
+        }
+      })
+      // Unreachable store: the browser's copy is already in place and every
+      // edit still saves locally, so this costs the sync, not the settings.
+      .catch(() => {});
+
+    return () => {
+      current = false;
+    };
   }, [productId, catalogColors]);
 
   // Template photos belong to the blank, so they reload with it.
@@ -407,16 +445,78 @@ export function EtsyPanel({
   const product = findProduct(productId);
   const isOrnament = productIsOrnament(product);
 
+  /**
+   * Every edit is written twice: to the browser at once, and to the store a
+   * moment later.
+   *
+   * The local write is immediate because it is free and it is what makes a
+   * reload feel like nothing happened. The remote write waits out the typing —
+   * a sixteen-line size run is hundreds of keystrokes, and one request each
+   * would be hundreds of writes to save the same field.
+   */
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<{ productId: string; settings: PublishSettings } | null>(null);
+  const [syncFailed, setSyncFailed] = useState(false);
+
+  /** Sends whatever is waiting, and remembers if the store refused it. */
+  const flush = useCallback((keepalive = false) => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+
+    const waiting = pending.current;
+    if (!waiting) return;
+    pending.current = null;
+
+    fetch(`/api/etsy/settings?productId=${encodeURIComponent(waiting.productId)}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(waiting.settings),
+      // Lets the request outlive the page when this is a departure.
+      keepalive,
+    })
+      .then((response) => setSyncFailed(!response.ok))
+      .catch(() => setSyncFailed(true));
+  }, []);
+
   const update = useCallback(
     (patch: Partial<PublishSettings>) => {
       setSettings((current) => {
         const next = { ...current, ...patch };
         window.localStorage.setItem(settingsKey(productId), JSON.stringify(next));
+
+        pending.current = { productId, settings: next };
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(() => flush(), 800);
+
         return next;
       });
     },
-    [productId],
+    [productId, flush],
   );
+
+  /**
+   * A save still waiting out the typing when the page is left would otherwise
+   * be the one edit that never reached the store — and the browser's copy is
+   * exactly what the seller is trying to stop depending on. Switching blanks,
+   * closing the tab and backgrounding the page all send it first.
+   */
+  useEffect(() => {
+    const leave = () => flush(true);
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") leave();
+    };
+
+    window.addEventListener("pagehide", leave);
+    document.addEventListener("visibilitychange", onHidden);
+
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      document.removeEventListener("visibilitychange", onHidden);
+      flush(true);
+    };
+  }, [flush]);
 
   useEffect(() => {
     fetch("/api/etsy/status")
@@ -1057,6 +1157,20 @@ export function EtsyPanel({
             Etsy rarely shows one shop twice for a query, so these split your placements rather
             than doubling them. Worth leading this listing with a different phrase.
           </p>
+        </div>
+      )}
+
+      {/*
+        Said rather than swallowed. The seller's whole reason for wanting these
+        off the browser is that a browser can be cleared, and a panel that
+        quietly fell back to localStorage would look exactly like one that had
+        not.
+      */}
+      {syncFailed && (
+        <div className="alert warn" style={{ marginTop: "1rem" }}>
+          These settings are saved in this browser but could not be saved to your account, so
+          clearing your browser data would still lose them. They will be sent again on the next
+          edit.
         </div>
       )}
 
