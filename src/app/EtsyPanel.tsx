@@ -410,8 +410,20 @@ export function EtsyPanel({
         if (!current) return;
 
         if (body.settings) {
+          const saved = body.settings as Partial<PublishSettings>;
           const merged = reconcileCatalog(
-            { ...local, ...(body.settings as Partial<PublishSettings>) },
+            {
+              ...local,
+              ...saved,
+              // Taken only from what was actually saved, never from `local`.
+              // With nothing in this browser, `local` is the fallback, whose
+              // marker says "these came from the catalogue" — true of the
+              // fallback and false of the account's copy layered over it. Left
+              // to be inherited it claims the seller has seen a run they have
+              // not, and silences the offer below. Same reasoning as in
+              // loadSettings; this is the other way settings arrive.
+              catalogSizesAt: saved.catalogSizesAt,
+            },
             findProduct(productId),
           );
           setSettings(merged);
