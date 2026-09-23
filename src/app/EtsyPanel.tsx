@@ -264,6 +264,55 @@ function settingsKey(productId: string): string {
  * Saved settings win; the catalogue's colourways only prefill a blank the
  * seller has not set up yet, so editing the list is never undone by a reload.
  */
+/**
+ * A run reduced to what it actually says.
+ *
+ * Two runs are the same run when they list the same things at the same prices.
+ * Compared as raw strings they are not: text pasted from a browser arrives with
+ * carriage returns, an editor leaves a space at the end of a line, a spare
+ * blank line sits at the bottom. None of that reaches Etsy and none of it is a
+ * difference worth telling anyone about — but left in, it produced a panel
+ * announcing that a sixteen-line run differed from a sixteen-line run.
+ */
+function normaliseRun(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => line.trim().replace(/\s*=\s*/, " = ").replace(/\s+/g, " "))
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * What one run has that the other does not, said in lines rather than counts.
+ *
+ * A difference the seller cannot see is one they cannot judge, and judging it
+ * is the whole point of being asked.
+ */
+function RunDifference({ mine, theirs }: { mine: string; theirs: string }) {
+  const ours = new Set(normaliseRun(mine).split("\n"));
+  const catalogue = new Set(normaliseRun(theirs).split("\n"));
+  const added = [...catalogue].filter((line) => !ours.has(line));
+  const dropped = [...ours].filter((line) => !catalogue.has(line));
+
+  const show = (lines: string[]) =>
+    lines.slice(0, 4).join(", ") + (lines.length > 4 ? `, and ${lines.length - 4} more` : "");
+
+  return (
+    <ul style={{ margin: "0.35rem 0 0", paddingLeft: "1.1rem" }}>
+      {added.length > 0 && (
+        <li>
+          Not in yours: <code>{show(added)}</code>
+        </li>
+      )}
+      {dropped.length > 0 && (
+        <li>
+          Only in yours: <code>{show(dropped)}</code>
+        </li>
+      )}
+    </ul>
+  );
+}
+
 /** The catalogue's run for a blank, as the editor's one-per-line text. */
 function catalogSizesText(product: Product): string | null {
   return product.sizes?.length
@@ -283,7 +332,15 @@ function reconcileCatalog(settings: PublishSettings, product: Product): PublishS
   const catalogSizes = catalogSizesText(product);
   if (!catalogSizes || settings.catalogSizesAt === catalogSizes) return settings;
 
-  return settings.catalogSizesAt !== undefined && settings.sizesText === settings.catalogSizesAt
+  // Already the catalogue's run, whatever the marker says — typed out by hand,
+  // or pasted with stray whitespace. Recorded as seen so nothing is announced
+  // about a run that is already in the box.
+  if (normaliseRun(settings.sizesText) === normaliseRun(catalogSizes)) {
+    return { ...settings, catalogSizesAt: catalogSizes };
+  }
+
+  return settings.catalogSizesAt !== undefined &&
+    normaliseRun(settings.sizesText) === normaliseRun(settings.catalogSizesAt)
     ? {
         ...settings,
         sizesText: catalogSizes,
@@ -767,7 +824,7 @@ export function EtsyPanel({
    * has to be a click, never an instruction to clear a box and paste.
    */
   const catalogRunDiffers =
-    catalogRun !== null && settings.sizesText.trim() !== catalogRun.trim();
+    catalogRun !== null && normaliseRun(settings.sizesText) !== normaliseRun(catalogRun);
   // Newly changed rather than merely different: worth a banner rather than a
   // line under the box.
   const catalogRunIsNew = catalogRunDiffers && settings.catalogSizesAt !== catalogRun;
@@ -1009,10 +1066,15 @@ export function EtsyPanel({
             <div className="alert info">
               <strong>This blank&apos;s size run has been updated.</strong>
               <p style={{ margin: "0.35rem 0 0" }}>
-                What is in the box is what you saved, so nothing has been changed. The updated run
-                has {catalogRun.split("\n").length} lines against your {""}
-                {settings.sizesText.split("\n").filter((line) => line.trim()).length}.
+                What is in the box is what you saved, so nothing has been changed.
               </p>
+              {/*
+                The lines themselves, not a pair of counts. Two runs of the same
+                length differ somewhere, and "16 lines against your 16" told the
+                seller there was a difference while hiding the only part of it
+                worth reading.
+              */}
+              <RunDifference mine={settings.sizesText} theirs={catalogRun} />
               <div className="actions" style={{ marginTop: "0.5rem" }}>
                 <button type="button" className="primary" onClick={takeCatalogRun}>
                   Use the updated run
@@ -1036,8 +1098,7 @@ export function EtsyPanel({
           */}
           {catalogRunDiffers && catalogRun && !catalogRunIsNew && (
             <p className="hint">
-              This blank ships with a run of {catalogRun.split("\n").length} lines; yours has{" "}
-              {settings.sizesText.split("\n").filter((line) => line.trim()).length}.{" "}
+              Your run differs from the one this blank ships with.{" "}
               <button type="button" className="linklike" onClick={takeCatalogRun}>
                 Use this blank&apos;s run
               </button>
