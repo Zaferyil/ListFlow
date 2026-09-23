@@ -117,6 +117,16 @@ interface PublishSettings {
   colorsText: string;
   /** Which ornament layout these values were saved under; see ORNAMENT_LAYOUT. */
   ornamentLayout?: number;
+  /**
+   * The catalogue's run at the time these settings last agreed with it.
+   *
+   * Saved settings beat the catalogue, which is right — they are the seller's
+   * own — but it left a correction to a blank's run with no way of reaching the
+   * one browser that most needed it. Recording what the catalogue said when
+   * these values were last reconciled separates "I changed this" from "I have
+   * simply not seen the new one", which is the whole of the difference.
+   */
+  catalogSizesAt?: string;
 }
 
 const DEFAULTS: PublishSettings = {
@@ -261,6 +271,28 @@ function catalogSizesText(product: Product): string | null {
     : null;
 }
 
+/**
+ * Settings against the catalogue's current run.
+ *
+ * Where the saved run is exactly what the catalogue last said, the seller never
+ * touched it, so a correction is taken without asking — nobody wants to be
+ * consulted about a value they did not choose. Where it differs, it is theirs
+ * and is left alone; the panel offers the new run instead.
+ */
+function reconcileCatalog(settings: PublishSettings, product: Product): PublishSettings {
+  const catalogSizes = catalogSizesText(product);
+  if (!catalogSizes || settings.catalogSizesAt === catalogSizes) return settings;
+
+  return settings.catalogSizesAt !== undefined && settings.sizesText === settings.catalogSizesAt
+    ? {
+        ...settings,
+        sizesText: catalogSizes,
+        sizeLabel: product.sizeLabel ?? settings.sizeLabel,
+        catalogSizesAt: catalogSizes,
+      }
+    : settings;
+}
+
 function loadSettings(productId: string, catalogColors: string): PublishSettings {
   const product = findProduct(productId);
   const isOrnament = productIsOrnament(product);
@@ -275,6 +307,7 @@ function loadSettings(productId: string, catalogColors: string): PublishSettings
       ? {
           sizesText: catalogSizes,
           sizeLabel: product.sizeLabel ?? DEFAULTS.sizeLabel,
+          catalogSizesAt: catalogSizes,
           // A run that names its garments is one to offer, not to hide behind
           // an unticked box.
           variationsOn: true,
@@ -288,12 +321,21 @@ function loadSettings(productId: string, catalogColors: string): PublishSettings
     const stored = window.localStorage.getItem(settingsKey(productId));
     if (!stored) return fallback;
 
-    const settings = { ...fallback, ...(JSON.parse(stored) as PublishSettings) };
+    const saved = JSON.parse(stored) as PublishSettings;
+    const settings = {
+      ...fallback,
+      ...saved,
+      // Never inherited from the fallback. The fallback's copy says "these
+      // values came from the catalogue", which is true of a fresh blank and
+      // false of a saved one — and letting it through would tell the panel the
+      // seller had already seen a run they have not, silencing the offer.
+      catalogSizesAt: saved.catalogSizesAt,
+    };
     // Category, profiles and price are still the seller's; only the menus,
     // whose values no longer mean what they did, go back to the defaults.
     return isOrnament && settings.ornamentLayout !== ORNAMENT_LAYOUT
       ? { ...settings, ...ORNAMENT_DEFAULTS, ornamentLayout: ORNAMENT_LAYOUT }
-      : settings;
+      : reconcileCatalog(settings, product);
   } catch {
     return fallback;
   }
@@ -368,7 +410,10 @@ export function EtsyPanel({
         if (!current) return;
 
         if (body.settings) {
-          const merged = { ...local, ...(body.settings as Partial<PublishSettings>) };
+          const merged = reconcileCatalog(
+            { ...local, ...(body.settings as Partial<PublishSettings>) },
+            findProduct(productId),
+          );
           setSettings(merged);
           window.localStorage.setItem(settingsKey(productId), JSON.stringify(merged));
         } else if (window.localStorage.getItem(settingsKey(productId))) {
@@ -699,6 +744,14 @@ export function EtsyPanel({
   const competitors = listing ? competingListings(listing, shopListings) : [];
   const sizeCount = parseSizes(settings.sizesText).length;
   const unreadableSizes = unreadableSizeLines(settings.sizesText);
+  // A run this blank now ships with that these settings are not using. Only
+  // ever offered — the values in the box are the seller's, and replacing them
+  // because the catalogue moved would be the app overruling them.
+  const catalogRun = catalogSizesText(product);
+  const catalogRunOffered =
+    catalogRun !== null &&
+    settings.catalogSizesAt !== catalogRun &&
+    settings.sizesText.trim() !== catalogRun.trim();
   const colorCount = parseColors(settings.colorsText).length;
   const offeringCount = sizeCount * Math.max(colorCount, 1);
   // A missing decimal point turns 49.99 into 4999 and reaches Etsy silently.
@@ -925,6 +978,38 @@ export function EtsyPanel({
               />
             </div>
           </div>
+          {catalogRunOffered && catalogRun && (
+            <div className="alert info">
+              <strong>This blank&apos;s size run has been updated.</strong>
+              <p style={{ margin: "0.35rem 0 0" }}>
+                What is in the box is what you saved, so nothing has been changed. The updated run
+                has {catalogRun.split("\n").length} lines against your {""}
+                {settings.sizesText.split("\n").filter((line) => line.trim()).length}.
+              </p>
+              <div className="actions" style={{ marginTop: "0.5rem" }}>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() =>
+                    update({
+                      sizesText: catalogRun,
+                      sizeLabel: product.sizeLabel ?? settings.sizeLabel,
+                      catalogSizesAt: catalogRun,
+                    })
+                  }
+                >
+                  Use the updated run
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => update({ catalogSizesAt: catalogRun })}
+                >
+                  Keep mine
+                </button>
+              </div>
+            </div>
+          )}
           {unreadableSizes.length > 0 && (
             <div className="alert warn">
               <strong>
