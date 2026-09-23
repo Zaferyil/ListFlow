@@ -166,7 +166,12 @@ export const PRODUCTS: Product[] = [
       // newborn reads "Newborn", not "NB", and the code is kept in brackets so
       // it still matches the size chart in the photos.
       { name: "Newborn (NB)", price: 39.99 },
-      { name: "0–6 Months (06M)", price: 39.99 },
+      // A plain hyphen, not an en dash. Typographically the dash is right, but
+      // this string is compared character for character against what the seller
+      // has in the panel, and it is a value they may retype or paste from
+      // anywhere — a dash nobody has on their keyboard makes the two disagree
+      // over a character that looks identical on screen.
+      { name: "0-6 Months (06M)", price: 39.99 },
       { name: "12 Months (12M)", price: 39.99 },
       { name: "18 Months (18M)", price: 39.99 },
       { name: "24 Months (24M)", price: 39.99 },
