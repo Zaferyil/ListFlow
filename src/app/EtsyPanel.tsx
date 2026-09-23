@@ -756,14 +756,29 @@ export function EtsyPanel({
   const competitors = listing ? competingListings(listing, shopListings) : [];
   const sizeCount = parseSizes(settings.sizesText).length;
   const unreadableSizes = unreadableSizeLines(settings.sizesText);
-  // A run this blank now ships with that these settings are not using. Only
-  // ever offered — the values in the box are the seller's, and replacing them
-  // because the catalogue moved would be the app overruling them.
   const catalogRun = catalogSizesText(product);
-  const catalogRunOffered =
-    catalogRun !== null &&
-    settings.catalogSizesAt !== catalogRun &&
-    settings.sizesText.trim() !== catalogRun.trim();
+  /**
+   * The box holds something other than what this blank ships with.
+   *
+   * Always actionable when true, whatever the marker says. The marker decides
+   * how loudly to mention it, and it can be wrong in the quiet direction — a
+   * run seen once and then replaced marks itself as seen forever — so it must
+   * never be the thing standing between the seller and the run. Reaching it
+   * has to be a click, never an instruction to clear a box and paste.
+   */
+  const catalogRunDiffers =
+    catalogRun !== null && settings.sizesText.trim() !== catalogRun.trim();
+  // Newly changed rather than merely different: worth a banner rather than a
+  // line under the box.
+  const catalogRunIsNew = catalogRunDiffers && settings.catalogSizesAt !== catalogRun;
+
+  const takeCatalogRun = () =>
+    catalogRun &&
+    update({
+      sizesText: catalogRun,
+      sizeLabel: product.sizeLabel ?? settings.sizeLabel,
+      catalogSizesAt: catalogRun,
+    });
   const colorCount = parseColors(settings.colorsText).length;
   const offeringCount = sizeCount * Math.max(colorCount, 1);
   // A missing decimal point turns 49.99 into 4999 and reaches Etsy silently.
@@ -990,7 +1005,7 @@ export function EtsyPanel({
               />
             </div>
           </div>
-          {catalogRunOffered && catalogRun && (
+          {catalogRunIsNew && catalogRun && (
             <div className="alert info">
               <strong>This blank&apos;s size run has been updated.</strong>
               <p style={{ margin: "0.35rem 0 0" }}>
@@ -999,17 +1014,7 @@ export function EtsyPanel({
                 {settings.sizesText.split("\n").filter((line) => line.trim()).length}.
               </p>
               <div className="actions" style={{ marginTop: "0.5rem" }}>
-                <button
-                  type="button"
-                  className="primary"
-                  onClick={() =>
-                    update({
-                      sizesText: catalogRun,
-                      sizeLabel: product.sizeLabel ?? settings.sizeLabel,
-                      catalogSizesAt: catalogRun,
-                    })
-                  }
-                >
+                <button type="button" className="primary" onClick={takeCatalogRun}>
                   Use the updated run
                 </button>
                 <button
@@ -1021,6 +1026,22 @@ export function EtsyPanel({
                 </button>
               </div>
             </div>
+          )}
+          {/*
+            Present whenever the box and the catalogue disagree, banner or no
+            banner. Once the offer above has been answered it stops being news,
+            but the run itself does not stop being wanted — and a seller who
+            dismissed it, or who never saw it because the marker said they had,
+            still needs one click rather than an explanation.
+          */}
+          {catalogRunDiffers && catalogRun && !catalogRunIsNew && (
+            <p className="hint">
+              This blank ships with a run of {catalogRun.split("\n").length} lines; yours has{" "}
+              {settings.sizesText.split("\n").filter((line) => line.trim()).length}.{" "}
+              <button type="button" className="linklike" onClick={takeCatalogRun}>
+                Use this blank&apos;s run
+              </button>
+            </p>
           )}
           {unreadableSizes.length > 0 && (
             <div className="alert warn">

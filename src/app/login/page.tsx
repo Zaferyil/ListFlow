@@ -60,7 +60,26 @@ function LoginForm() {
   );
 }
 
+/**
+ * Which commit this deploy was built from.
+ *
+ * "The change is not there" and "the change has not shipped yet" look
+ * identical from inside the app, and telling them apart meant guessing from
+ * asset hashes — which are not comparable between one machine's build and
+ * another's, so the guess was worthless. Netlify puts the commit in COMMIT_REF
+ * at build time; this is simply it, said out loud.
+ *
+ * It sits on the sign-in page because that is the only page reachable without
+ * the password, which is exactly when you need to ask the question.
+ */
+function builtFrom(): string | null {
+  const ref = process.env.NEXT_PUBLIC_COMMIT_REF;
+  return ref ? ref.slice(0, 7) : null;
+}
+
 export default function LoginPage() {
+  const build = builtFrom();
+
   return (
     <main className="page" style={{ maxWidth: "26rem" }}>
       <div className="hero">
@@ -71,6 +90,12 @@ export default function LoginPage() {
       <Suspense fallback={null}>
         <LoginForm />
       </Suspense>
+
+      {build && (
+        <p className="hint" style={{ textAlign: "center" }}>
+          build <code>{build}</code>
+        </p>
+      )}
     </main>
   );
 }
